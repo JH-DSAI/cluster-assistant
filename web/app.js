@@ -73,6 +73,7 @@ const GROUP_TEXT = {
 };
 
 const JOB_COLOR = { running: "var(--series-1)", pending: "var(--series-2)" };
+const JOB_TEXT = { running: "var(--on-series-1)", pending: "var(--on-series-2)" };
 // CPU cores reuse the node-state colours: in use, free, unavailable.
 const CPU_COLOR = { alloc: "var(--node-alloc)", idle: "var(--node-idle)", other: "var(--status-warning)" };
 const CPU_LABEL = { alloc: "Allocated", idle: "Idle", other: "Unavailable" };
@@ -485,7 +486,6 @@ function problemCard(parts) {
 }
 
 function queueCard(parts) {
-  const max = Math.max(1, ...parts.map((p) => p.running + p.pending));
   // Legend totals count each job once, so they agree with the tiles above; the
   // per-partition bars sum higher because multi-partition jobs appear in each.
   const jobs = scopedJobs();
@@ -513,9 +513,8 @@ function queueCard(parts) {
         <p class="axis-note">Median wait and longest wait are measured from each job's submit time to when the dump was taken. <em>Next start</em> is the soonest estimate the scheduler has produced for anything waiting here; <em>frees up</em> is the time remaining on the running job that finishes soonest.</p>`
       : `<div class="rows">${parts
           .map((p) => {
-            const total = p.running + p.pending;
             return (
-              `<div class="row"><div class="row-label">${esc(p.name)}${
+              `<div class="row row-solo"><div class="row-label">${esc(p.name)}${
                 p.isDefault ? '<span class="dflt">*</span>' : ""
               }</div>` +
               segments(
@@ -523,6 +522,7 @@ function queueCard(parts) {
                   {
                     value: p.running,
                     color: JOB_COLOR.running,
+                    textColor: JOB_TEXT.running,
                     tip:
                       `${p.name}: ${n(p.running)} running` +
                       (p.runningCpus ? `\n${n(p.runningCpus)} CPUs, ${n(p.runningGpus)} GPUs in use` : "") +
@@ -531,6 +531,7 @@ function queueCard(parts) {
                   {
                     value: p.pending,
                     color: JOB_COLOR.pending,
+                    textColor: JOB_TEXT.pending,
                     tip:
                       `${p.name}: ${n(p.pending)} pending (${n(p.pendingTasks)} array tasks)` +
                       (p.pendingCpus ? `\n${n(p.pendingCpus)} CPUs, ${n(p.pendingGpus)} GPUs requested` : "") +
@@ -541,15 +542,15 @@ function queueCard(parts) {
                       (p.reasons.length ? `\ntop reason: ${p.reasons[0][0]} (${n(p.reasons[0][1])})` : ""),
                   },
                 ],
-                Math.max(2, (total / max) * 100),
+                100,
+                "",
+                true,
               ) +
-              `<div class="row-value"><b>${n(p.pending)}</b> pending · ${n(p.running)} running</div></div>`
+              `</div>`
             );
           })
           .join("")}</div>
-        <p class="axis-note">Bar length is comparable across partitions — full width = ${n(
-          max,
-        )} jobs. A job that requested several partitions is counted in each.</p>`;
+        <p class="axis-note">Each bar is one partition's jobs, split into running and pending — full width is that partition's total. A job that requested several partitions is counted in each.</p>`;
 
   const reasons = new Map();
   for (const p of parts) for (const [r, c] of p.reasons) reasons.set(r, (reasons.get(r) ?? 0) + c);

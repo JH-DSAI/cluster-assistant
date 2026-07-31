@@ -44,6 +44,8 @@
   --series-6: #008300;
   --series-7: #4a3aa7;
   --series-8: #e34948;
+  --on-series-1: #ffffff;
+  --on-series-2: #3d2600;
 }
 
 @media (prefers-color-scheme: dark) {
