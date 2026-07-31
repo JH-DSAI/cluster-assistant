@@ -649,10 +649,33 @@ h2 {
   min-width: 0;
 }
 
+/* Taller mark so a centred value fits inside the fill itself. */
+.bar.labeled {
+  height: 20px;
+}
+
+.bar.labeled .seg > i {
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.seg-label {
+  font-size: 11px;
+  font-weight: 600;
+  font-style: normal;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  padding: 0 3px;
+  white-space: nowrap;
+}
+
 /* Cores/GPUs split: cells are direct grid children (not one grid per row) so
    every row shares the same column tracks and the divider lines up exactly. */
 .rows-split {
-  grid-template-columns: 92px 1fr 1fr auto;
+  grid-template-columns: 92px 1fr 1fr;
   align-items: center;
   column-gap: 12px;
   row-gap: 4px;
@@ -878,9 +901,6 @@ main[data-busy="1"] {
     grid-column: 1 / -1;
     border-left: 0;
     padding-left: 0;
-  }
-  .rows-split .row-value {
-    grid-column: 1 / -1;
   }
   .rows-split .head-cell {
     display: none;

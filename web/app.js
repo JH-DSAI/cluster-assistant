@@ -66,6 +66,9 @@ const JOB_COLOR = { running: "var(--series-1)", pending: "var(--series-2)" };
 // CPU cores reuse the node-state colours: in use, free, unavailable.
 const CPU_COLOR = { alloc: "var(--node-alloc)", idle: "var(--node-idle)", other: "var(--status-warning)" };
 const CPU_LABEL = { alloc: "Allocated", idle: "Idle", other: "Unavailable" };
+// Legible text over each fill colour: alloc and unavailable are dark/saturated
+// enough for white, idle is too light and needs a dark label instead.
+const CPU_TEXT = { alloc: "#fff", idle: "#0b2545", other: "#3d2600" };
 const factorColor = (f) => `var(--series-${FACTORS.indexOf(f) + 1})`;
 // Colour follows the GPU model, fixed by its position in the sorted type list,
 // so filtering the table never repaints a series.
@@ -258,18 +261,20 @@ function legend(entries) {
     .join("")}</div>`;
 }
 
-function segments(parts, widthPct = 100, extraClass = "") {
-  const cls = extraClass ? ` ${extraClass}` : "";
+function segments(parts, widthPct = 100, extraClass = "", labeled = false) {
+  const cls = [extraClass, labeled ? "labeled" : ""].filter(Boolean).join(" ");
   const total = parts.reduce((t, p) => t + p.value, 0);
-  if (!total) return `<div class="bar${cls}" style="width:${widthPct}%"><span class="track"></span></div>`;
+  if (!total) return `<div class="bar${cls ? ` ${cls}` : ""}" style="width:${widthPct}%"><span class="track"></span></div>`;
   const segs = parts
     .filter((p) => p.value > 0)
     .map(
       (p) =>
-        `<span class="seg" style="flex:${p.value};--c:${p.color}" data-tip="${esc(p.tip)}"><i></i></span>`,
+        `<span class="seg" style="flex:${p.value};--c:${p.color}" data-tip="${esc(p.tip)}"><i>${
+          labeled ? `<span class="seg-label" style="color:${p.textColor ?? "#fff"}">${n(p.value)}</span>` : ""
+        }</i></span>`,
     )
     .join("");
-  return `<div class="bar${cls}" style="width:${widthPct}%">${segs}</div>`;
+  return `<div class="bar${cls ? ` ${cls}` : ""}" style="width:${widthPct}%">${segs}</div>`;
 }
 
 function nodeTip(p, group) {
@@ -367,7 +372,7 @@ function capacityCard(parts) {
           )
           .join("")}</tbody></table></div>`
       : `<div class="rows rows-split">
-          <div class="row-label head-cell"></div><div class="col-head head-cell">Cores</div><div class="col-head gpu-bar head-cell">GPUs</div><div class="head-cell"></div>
+          <div class="row-label head-cell"></div><div class="col-head head-cell">Cores</div><div class="col-head gpu-bar head-cell">GPUs</div>
           ${withCpus
           .map((p) => {
             const cpuSegs = kinds
@@ -375,6 +380,7 @@ function capacityCard(parts) {
               .map((k) => ({
                 value: p.cpu[k],
                 color: CPU_COLOR[k],
+                textColor: CPU_TEXT[k],
                 tip:
                   `${p.name} · ${CPU_LABEL[k]}: ${n(p.cpu[k])} of ${n(p.cpu.total)} CPUs (${(
                     (p.cpu[k] / p.cpu.total) *
@@ -387,19 +393,17 @@ function capacityCard(parts) {
               .map((k) => ({
                 value: gpuValues[k],
                 color: CPU_COLOR[k],
+                textColor: CPU_TEXT[k],
                 tip: `${p.name} · ${CPU_LABEL[k]}: ${n(gpuValues[k])} of ${n(p.gpuTotal)} ${
                   p.gpuModel ?? ""
                 } GPUs (${((gpuValues[k] / p.gpuTotal) * 100).toFixed(0)}%)`,
               }));
             return (
               `<div class="row-label">${esc(p.name)}</div>` +
-              segments(cpuSegs) +
+              segments(cpuSegs, 100, "", true) +
               (p.gpuTotal
-                ? segments(gpuSegs, 100, "gpu-bar")
-                : `<div class="bar gpu-bar"><span class="none">no GPUs</span></div>`) +
-              `<div class="row-value"><b>${n(p.cpu.idle)}</b> of ${n(p.cpu.total)} cores free${
-                p.gpuTotal ? ` · ${n(gpuFree(p))} of ${n(p.gpuTotal)} GPUs` : ""
-              }</div>`
+                ? segments(gpuSegs, 100, "gpu-bar", true)
+                : `<div class="bar gpu-bar"><span class="none">no GPUs</span></div>`)
             );
           })
           .join("")}</div>
