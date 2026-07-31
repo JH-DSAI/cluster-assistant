@@ -26,6 +26,15 @@
   --status-critical: #d03b3b;
   --status-good: #0ca30c;
 
+  /* Legible label colour for text set directly on each of the above fills */
+  --on-idle: #0b2545;
+  --on-mix: #ffffff;
+  --on-alloc: #ffffff;
+  --on-resv: #1a1a19;
+  --on-other: #ffffff;
+  --on-warning: #3d2600;
+  --on-critical: #ffffff;
+
   /* Categorical slots, fixed order */
   --series-1: #2a78d6;
   --series-2: #eb6834;
@@ -55,6 +64,7 @@
     --node-alloc: #184f95;
     --node-resv: #898781;
     --node-other: #c3c2b7;
+    --on-other: #1a1a19;
 
     --series-1: #3987e5;
     --series-2: #d95926;
@@ -84,6 +94,7 @@
   --node-alloc: #184f95;
   --node-resv: #898781;
   --node-other: #c3c2b7;
+  --on-other: #1a1a19;
 
   --series-1: #3987e5;
   --series-2: #d95926;
@@ -593,6 +604,11 @@ h2 {
   grid-template-columns: 92px 1fr auto;
   align-items: center;
   gap: 12px;
+}
+
+/* No trailing value column — the bar's own segment labels carry the numbers. */
+.row-solo {
+  grid-template-columns: 92px 1fr;
 }
 
 .row-label {

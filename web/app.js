@@ -61,14 +61,22 @@ const GROUP_COLOR = {
   offline: "var(--status-critical)",
   other: "var(--node-other)",
 };
+// Legible label colour for text set directly on each fill above.
+const GROUP_TEXT = {
+  idle: "var(--on-idle)",
+  mix: "var(--on-mix)",
+  alloc: "var(--on-alloc)",
+  resv: "var(--on-resv)",
+  unavail: "var(--on-warning)",
+  offline: "var(--on-critical)",
+  other: "var(--on-other)",
+};
 
 const JOB_COLOR = { running: "var(--series-1)", pending: "var(--series-2)" };
 // CPU cores reuse the node-state colours: in use, free, unavailable.
 const CPU_COLOR = { alloc: "var(--node-alloc)", idle: "var(--node-idle)", other: "var(--status-warning)" };
 const CPU_LABEL = { alloc: "Allocated", idle: "Idle", other: "Unavailable" };
-// Legible text over each fill colour: alloc and unavailable are dark/saturated
-// enough for white, idle is too light and needs a dark label instead.
-const CPU_TEXT = { alloc: "#fff", idle: "#0b2545", other: "#3d2600" };
+const CPU_TEXT = { alloc: "var(--on-alloc)", idle: "var(--on-idle)", other: "var(--on-warning)" };
 const factorColor = (f) => `var(--series-${FACTORS.indexOf(f) + 1})`;
 // Colour follows the GPU model, fixed by its position in the sorted type list,
 // so filtering the table never repaints a series.
@@ -314,7 +322,7 @@ function nodesCard(parts) {
       : `<div class="rows">${parts
           .map(
             (p) =>
-              `<div class="row"><div class="row-label">${esc(p.name)}${
+              `<div class="row row-solo"><div class="row-label">${esc(p.name)}${
                 p.isDefault ? '<span class="dflt">*</span>' : ""
               }</div>` +
               (p.nodes === 0
@@ -323,10 +331,14 @@ function nodesCard(parts) {
                     STATE_GROUPS.filter((g) => p.byGroup[g] > 0).map((g) => ({
                       value: p.byGroup[g],
                       color: GROUP_COLOR[g],
+                      textColor: GROUP_TEXT[g],
                       tip: nodeTip(p, g),
                     })),
+                    100,
+                    "",
+                    true,
                   )) +
-              `<div class="row-value"><b>${n(p.nodes)}</b> nodes</div></div>`,
+              `</div>`,
           )
           .join("")}</div>
         <p class="axis-note">Each bar is one partition's nodes, split by state — full width is that partition's total, labelled at the tip. <code>*</code> marks the default partition. Nodes shared between partitions appear in each.</p>`;
