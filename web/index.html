@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SLURM cluster status</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%232a78d6'/%3E%3Crect x='3' y='9' width='3' height='4' fill='%23fff'/%3E%3Crect x='7' y='6' width='3' height='7' fill='%23fff'/%3E%3Crect x='11' y='3' width='2' height='10' fill='%23fff'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="topbar">
+        <h1>SLURM cluster status</h1>
+        <div class="topbar-right">
+          <span class="freshness" id="freshness">loading…</span>
+          <label class="freshness"
+            ><input type="checkbox" id="auto" checked /> auto-refresh</label
+          >
+          <button id="refresh">Refresh</button>
+          <button id="theme" title="Toggle light / dark">◐</button>
+        </div>
+      </header>
+
+      <nav class="tabs" role="tablist" aria-label="Views">
+        <button role="tab" id="tab-status" data-tab="status" aria-selected="true" aria-controls="view-status">
+          Cluster status
+        </button>
+        <button role="tab" id="tab-plan" data-tab="plan" aria-selected="false" aria-controls="view-plan">
+          Plan a job
+        </button>
+      </nav>
+
+      <div id="errors"></div>
+
+      <section id="view-status" role="tabpanel" aria-labelledby="tab-status">
+        <div class="filters" id="filters" hidden>
+          <label for="f-part">Partition</label>
+          <select id="f-part"></select>
+          <label for="f-user">User</label>
+          <input type="search" id="f-user" placeholder="e.g. xwang378" />
+          <button id="f-clear">Clear</button>
+          <span class="filter-note" id="filter-note"></span>
+        </div>
+
+        <main id="main"></main>
+      </section>
+
+      <section id="view-plan" role="tabpanel" aria-labelledby="tab-plan" hidden>
+        <div class="plan-grid">
+          <form class="card plan-form" id="plan-form" autocomplete="off">
+            <div class="card-head">
+              <h2>The job you want to run</h2>
+              <button type="button" id="plan-reset" title="Switch every directive back off">Clear all</button>
+            </div>
+            <p class="card-sub">
+              Every <code>#SBATCH</code> directive is optional. Tick one to write it into the preamble — it starts at
+              whatever SLURM would have used anyway, so switching it on changes nothing about the job until you edit
+              it. Leave it clear and the estimates beside this run on the cluster's own default; hover a tick box to
+              see what that is.
+            </p>
+
+            <fieldset>
+              <legend>Where it runs</legend>
+              <input type="checkbox" class="opt" data-opt="jobName" aria-label="Set --job-name" />
+              <label for="p-name">Job name</label>
+              <input type="text" id="p-name" name="jobName" value="myjob" disabled />
+              <input type="checkbox" class="opt" data-opt="partition" aria-label="Set --partition" />
+              <label for="p-part">Partition</label>
+              <select id="p-part" name="partition" disabled></select>
+              <input type="checkbox" class="opt" data-opt="account" aria-label="Set --account" />
+              <label for="p-account">Account</label>
+              <select id="p-account" name="account" disabled></select>
+              <input type="checkbox" class="opt" data-opt="qos" aria-label="Set --qos" />
+              <label for="p-qos">QOS</label>
+              <select id="p-qos" name="qos" disabled></select>
+            </fieldset>
+
+            <fieldset>
+              <legend>Size</legend>
+              <input type="checkbox" class="opt" data-opt="nodes" aria-label="Set --nodes" />
+              <label for="p-nodes">Nodes</label>
+              <input type="number" id="p-nodes" name="nodes" min="1" step="1" value="1" disabled />
+              <input type="checkbox" class="opt" data-opt="ntasksPerNode" aria-label="Set --ntasks-per-node" />
+              <label for="p-tasks">Tasks/node</label>
+              <input type="number" id="p-tasks" name="ntasksPerNode" min="1" step="1" value="1" disabled />
+              <input type="checkbox" class="opt" data-opt="cpusPerTask" aria-label="Set --cpus-per-task" />
+              <label for="p-cpt">CPUs/task</label>
+              <input type="number" id="p-cpt" name="cpusPerTask" min="1" step="1" value="1" disabled />
+              <input type="checkbox" class="opt" data-opt="gpus" aria-label="Set --gpus-per-node" />
+              <label for="p-gpus">GPUs/node</label>
+              <div class="pair">
+                <input type="number" id="p-gpus" name="gpusPerNode" min="0" step="1" value="0" disabled />
+                <select id="p-gpumodel" name="gpuModel" aria-label="GPU model" disabled></select>
+              </div>
+              <input type="checkbox" class="opt" data-opt="mem" aria-label="Set --mem" />
+              <label for="p-mem">Memory</label>
+              <div class="pair">
+                <input type="number" id="p-mem" name="memValue" min="0" step="1" value="4" disabled />
+                <select id="p-memunit" name="memUnit" class="short" aria-label="Memory unit" disabled>
+                  <option>M</option>
+                  <option selected>G</option>
+                  <option>T</option>
+                </select>
+                <select id="p-memper" name="memPer" aria-label="Memory per" disabled>
+                  <option value="node" selected>per node</option>
+                  <option value="cpu">per CPU</option>
+                </select>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Runtime</legend>
+              <input type="checkbox" class="opt" data-opt="time" aria-label="Set --time" />
+              <label for="p-days">Walltime</label>
+              <div class="pair">
+                <input type="number" id="p-days" name="days" min="0" step="1" value="0" aria-label="Days" disabled />
+                <span class="unit">d</span>
+                <input type="number" id="p-hours" name="hours" min="0" max="23" step="1" value="1" aria-label="Hours" disabled />
+                <span class="unit">h</span>
+                <input type="number" id="p-mins" name="minutes" min="0" max="59" step="1" value="0" aria-label="Minutes" disabled />
+                <span class="unit">m</span>
+              </div>
+              <input type="checkbox" class="opt" data-opt="array" aria-label="Set --array" />
+              <label for="p-array">Array</label>
+              <input type="text" id="p-array" name="array" placeholder="e.g. 0-9%4" disabled />
+            </fieldset>
+
+            <details id="plan-more">
+              <summary>Output, mail and node selection</summary>
+              <fieldset>
+                <input type="checkbox" class="opt" data-opt="output" aria-label="Set --output" />
+                <label for="p-out">Output</label>
+                <input type="text" id="p-out" name="output" value="slurm-%j.out" disabled />
+                <input type="checkbox" class="opt" data-opt="error" aria-label="Set --error" />
+                <label for="p-err">Error</label>
+                <input type="text" id="p-err" name="error" placeholder="merged into --output" disabled />
+                <input type="checkbox" class="opt" data-opt="mail" aria-label="Set --mail-type" />
+                <label for="p-mailtype">Mail on</label>
+                <select id="p-mailtype" name="mailType" disabled>
+                  <option value="END,FAIL" selected>END,FAIL</option>
+                  <option value="FAIL">FAIL</option>
+                  <option value="BEGIN,END,FAIL">BEGIN,END,FAIL</option>
+                  <option value="ALL">ALL</option>
+                </select>
+                <span class="opt-blank"></span>
+                <label for="p-mailuser">Mail to</label>
+                <input type="email" id="p-mailuser" name="mailUser" placeholder="you@example.edu" disabled />
+                <input type="checkbox" class="opt" data-opt="constraint" aria-label="Set --constraint" />
+                <label for="p-constraint">Constraint</label>
+                <input type="text" id="p-constraint" name="constraint" placeholder="node feature" disabled />
+                <span class="opt-blank"></span>
+                <label for="p-flags">Flags</label>
+                <div class="checks">
+                  <label><input type="checkbox" id="p-excl" name="exclusive" /> exclusive</label>
+                  <label><input type="checkbox" id="p-requeue" name="requeue" /> requeue</label>
+                </div>
+              </fieldset>
+            </details>
+          </form>
+
+          <div id="plan-out"></div>
+        </div>
+      </section>
+    </div>
+
+    <div id="tip" role="tooltip"></div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

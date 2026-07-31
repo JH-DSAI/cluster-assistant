@@ -1,0 +1,854 @@
+/* Palette roles. Light values first; the dark block below is a selected set of
+   steps for the dark surface, declared under both the OS media query and the
+   explicit [data-theme] stamp so the in-page toggle wins either way. */
+:root {
+  color-scheme: light;
+
+  --page: #f9f9f7;
+  --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --wash: rgba(11, 11, 11, 0.04);
+
+  /* Node utilisation: one hue, light -> dark (ordinal ramp, blue 250/400/600) */
+  --node-idle: #86b6ef;
+  --node-mix: #3987e5;
+  --node-alloc: #184f95;
+  /* Neutral administrative states */
+  --node-resv: #898781;
+  --node-other: #52514e;
+  /* Reserved status tokens: never used for a series */
+  --status-warning: #fab219;
+  --status-critical: #d03b3b;
+  --status-good: #0ca30c;
+
+  /* Categorical slots, fixed order */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --wash: rgba(255, 255, 255, 0.06);
+
+    --node-idle: #9ec5f4;
+    --node-mix: #2a78d6;
+    --node-alloc: #184f95;
+    --node-resv: #898781;
+    --node-other: #c3c2b7;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface-1: #1a1a19;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --wash: rgba(255, 255, 255, 0.06);
+
+  --node-idle: #9ec5f4;
+  --node-mix: #2a78d6;
+  --node-alloc: #184f95;
+  --node-resv: #898781;
+  --node-other: #c3c2b7;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text-primary);
+  font: 400 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 24px 72px;
+}
+
+/* ---------- header ---------- */
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 20px;
+  margin-bottom: 4px;
+}
+
+h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.freshness {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.stale {
+  color: var(--text-primary);
+  background: var(--wash);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.stale::before {
+  content: "⚠ ";
+}
+
+button,
+select,
+input[type="search"] {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  min-height: 30px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover,
+select:hover {
+  background: var(--wash);
+}
+
+/* ---------- tabs ---------- */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin: 18px 0 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 8px 14px;
+  min-height: 34px;
+  font-size: 13px;
+}
+
+.tabs button:hover {
+  background: var(--wash);
+}
+
+.tabs button[aria-selected="true"] {
+  color: var(--text-primary);
+  font-weight: 600;
+  border-bottom-color: var(--series-1);
+}
+
+/* ---------- job planner ---------- */
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  margin-top: 20px;
+}
+
+/* The form stays put while the estimates beside it are read. It scrolls within
+   itself when expanded past the viewport, which a plain sticky block would
+   otherwise leave with its lower fields unreachable. */
+.plan-form {
+  position: sticky;
+  top: 16px;
+  margin-bottom: 0;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+/* Three columns: the tick that decides whether the directive is written at all,
+   its name, and its value. */
+.plan-form fieldset {
+  border: 0;
+  border-top: 1px solid var(--grid);
+  margin: 0 0 14px;
+  padding: 12px 0 0;
+  display: grid;
+  grid-template-columns: 16px 84px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 8px;
+}
+
+.plan-form input.opt {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--series-1);
+}
+
+/* An unwritten directive is still readable — the value shown is what SLURM
+   would use — but it should not look like part of the preamble. */
+.plan-form :disabled {
+  opacity: 0.45;
+}
+
+.plan-form label.off {
+  color: var(--muted);
+}
+
+.plan-form legend {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 0 6px 0 0;
+}
+
+.plan-form label {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.plan-form input,
+.plan-form select {
+  width: 100%;
+  min-width: 0;
+}
+
+.plan-form input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* value + unit + scope on one line, e.g. 64 / G / per node — wrapping rather
+   than truncating a select, which would hide the choice that is in effect */
+.plan-form .pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.plan-form .pair input[type="number"] {
+  width: 3.8em;
+  flex: none;
+  padding-right: 4px;
+}
+
+.plan-form .pair select {
+  flex: 1 1 5.5em;
+  width: auto;
+}
+
+/* The unit select holds one character, so it should not take an equal share. */
+.plan-form .pair select.short {
+  flex: 0 1 3.6em;
+}
+
+.plan-form .unit {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.plan-form .checks {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.plan-form .checks label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.plan-form .checks input {
+  width: auto;
+}
+
+.plan-form details {
+  border-top: 1px solid var(--grid);
+  padding-top: 10px;
+}
+
+.plan-form summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.plan-form details fieldset {
+  border-top: 0;
+  padding-top: 12px;
+}
+
+/* Denser than the dashboard's KPI row: these tiles sit inside a card. The
+   label keeps its two-line reserve so the values stay on a common baseline
+   whether or not a label wraps. */
+.plan-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin-bottom: 16px;
+}
+
+.plan-kpis .tile-value {
+  font-size: 22px;
+}
+
+.preamble {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--page);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-x: auto;
+  font: 400 12.5px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text-primary);
+}
+
+.checks-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Two columns, so a long explanation wraps under itself rather than under the
+   status chip. */
+.checks-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--grid);
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.checks-list li b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.checks-list .chip {
+  font-size: 12px;
+}
+
+/* The directives the preamble leaves out, against what SLURM puts there
+   instead. Same two-column shape as the checks list, since it is read the same
+   way: a name on the left, a consequence on the right. */
+.unset-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.unset-list li {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--grid);
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+}
+
+@media (max-width: 860px) {
+  .plan-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .plan-form {
+    position: static;
+    margin-bottom: 20px;
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+/* ---------- filter row (one row, above everything it scopes) ---------- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0 24px;
+  padding: 12px 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.filters label {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.filters input[type="search"] {
+  width: 170px;
+}
+
+.filter-note {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---------- figures ---------- */
+
+.kpis {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.2fr) repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.tile {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.tile-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  /* Keeps values on a common baseline when a label wraps to two lines. */
+  min-height: 2.4em;
+}
+
+.tile-value {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+}
+
+.tile-sub {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.tile-value .of {
+  color: var(--muted);
+  font-size: 17px;
+  font-weight: 400;
+}
+
+/* ---------- cards ---------- */
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px 20px;
+  margin-bottom: 20px;
+}
+
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  margin-bottom: 4px;
+}
+
+h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.card-sub {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin: 0 0 16px;
+}
+
+.toggle {
+  margin-left: auto;
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.toggle button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  min-height: 26px;
+  font-size: 12px;
+}
+
+.toggle button[aria-pressed="true"] {
+  background: var(--wash);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ---------- legend ---------- */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.legend .count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- bar rows ---------- */
+
+.rows {
+  display: grid;
+  gap: 4px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.row-label {
+  font-size: 13px;
+  color: var(--text-primary);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-label .dflt {
+  color: var(--muted);
+}
+
+/* 24px tall hit area holding a 12px mark, so hover targets clear the minimum */
+.bar {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: transparent;
+}
+
+.bar .seg {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  min-width: 2px;
+  cursor: default;
+}
+
+.bar .seg > i {
+  display: block;
+  width: 100%;
+  height: 12px;
+  background: var(--c);
+}
+
+.bar .seg:last-child > i {
+  border-radius: 0 4px 4px 0;
+}
+
+.bar .none {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.bar .track {
+  flex: 1;
+  height: 12px;
+  border-radius: 0 4px 4px 0;
+  background: var(--grid);
+  min-width: 0;
+}
+
+.row-value {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.row-value b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.axis-note {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--grid);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---------- tables ---------- */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--grid);
+  white-space: nowrap;
+}
+
+th {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+td.num,
+th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+tbody tr:hover {
+  background: var(--wash);
+}
+
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Job names are no longer truncated by squeue, so cap them here instead. */
+td.clip {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dim {
+  color: var(--muted);
+}
+
+/* inline status chip: colour never carries the meaning alone */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.chip .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--c);
+}
+
+/* ---------- priority queue ---------- */
+
+.pq {
+  margin-bottom: 20px;
+}
+
+.pq-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin-bottom: 8px;
+}
+
+.pq-head h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.pq-head .dim {
+  font-size: 13px;
+}
+
+.pq-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 18px;
+  width: 130px;
+}
+
+.pq-bar .seg {
+  height: 8px;
+  min-width: 1px;
+}
+
+.pq-bar .seg:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.more {
+  margin-top: 8px;
+}
+
+/* ---------- notes / errors ---------- */
+
+.notes {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.notes li {
+  margin-bottom: 5px;
+}
+
+.error {
+  border-left: 3px solid var(--status-critical);
+  padding: 10px 14px;
+  background: var(--wash);
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.error::before {
+  content: "⚠ ";
+}
+
+/* ---------- tooltip ---------- */
+
+#tip {
+  position: fixed;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 90ms;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  max-width: 320px;
+  white-space: pre-line;
+}
+
+#tip[data-show="1"] {
+  opacity: 1;
+}
+
+#tip b {
+  font-weight: 600;
+}
+
+#tip .tip-nodes {
+  color: var(--text-secondary);
+  margin-top: 4px;
+  word-break: break-word;
+}
+
+/* hold the previous render while refetching — no skeleton flash */
+main[data-busy="1"] {
+  opacity: 0.6;
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 70px 1fr;
+  }
+  .row-value {
+    grid-column: 2;
+    text-align: right;
+  }
+}

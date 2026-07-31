@@ -1,0 +1,102 @@
+The job size calculation is based on the number of CPUs not GPUs and seems to be:
+
+$$JOBSIZE\_SCORE = \lfloor 23.8 + (0.204 \times CPUS) \rfloor$$
+
+Calculating the AGE_SCORE:
+
+$$\text{AGE\_SCORE} = 5000 \times \left( \frac{\text{Current Time} - \text{Eligible Time}}{\text{PriorityMaxAge}} \right)$$
+
+PriorityMaxAge is 7 days or 604800 seconds.
+
+These are in seconds. The eligible time represents the time the job could actually be run. not held up for dependencies or limits
+
+According to Gemini.
+
+---
+
+Checked against the dumps, and Gemini was right — but the job size formula is the
+nodes=1 case of SLURM's general one:
+
+$$JOBSIZE = \left\lfloor \frac{W_{jobsize}}{2} \times \left( \frac{NODES}{N} + \frac{CPUS}{C} \right) \right\rfloor$$
+
+with $W_{jobsize} = 5000$, $C = 12128$ (total cluster cores, exactly sinfo's sum)
+and $N \approx 105$ (slurm.conf's node_record_count; sinfo lists only 103, so two
+nodes are hidden or FUTURE). That gives $2500/105 = 23.81$ and $2500/12128 = 0.2061$,
+which is where the 23.8 and 0.204 came from.
+
+Reproduces the JOBSIZE column exactly for 96% of 1073 sprio rows. The other 4% are
+all jobs that asked for GPUs and let SLURM pick the cores: squeue's CPUS column
+reports the requested minimum, but the scheduler costed the real allocation, so
+e.g. a row showing 1 CPU has a job size implying ~119.
+
+PriorityMaxAge = 7 days confirmed to 0.03%, PriorityWeightAge = 5000 exactly
+(sprio's weighted AGE / normalized AGE). Every other factor evaluates to 0 for
+every pending job, so priority is age + job size, and since job size spans ~24-50
+against age's 5000, the queue is very nearly FIFO. (Not because all their weights
+are unset — see fair-share below.)
+
+Confirmed against `scontrol show config`, which is now in `data/`:
+PriorityWeightAge=5000, PriorityMaxAge=7-00:00:00, PriorityWeightJobSize=5000,
+PriorityFavorSmall=no. All three fitted values were right.
+
+N is 105. `scontrol show partition` totals 103 nodes across the five partitions,
+same as sinfo, so two nodes are configured in slurm.conf and in no partition. The
+job-size factor divides by the full node_record_count, so the page still has to
+fit that one number.
+
+The 4% that did not match are explained: `JobDefaults=DefCpuPerGPU` (30 on nvl and
+h100, 14 on l40s, 10 on a100) and `MaxMemPerCPU` both raise a job's core count
+above what squeue's %C reports, and SLURM costs the raised figure. Score only the
+rows where neither rule could have applied and agreement is 98.8%.
+
+Two more things worth remembering:
+
+PriorityWeightFairShare=20000, four times the age weight — but every FAIRSHARE
+value in sprio is 0 and every FairShare in sshare is 0.000000, so it does nothing.
+Priority really is age + jobsize.
+
+`PriorityFlags=CALCULATE_RUNNING,MAX_TRES`. MAX_TRES means a node is billed for
+the largest of its weighted TRES, not the sum. Every partition sets MaxMemPerCPU
+so the memory term maxes out at 0.977 per core against CPU=1 — so billing is
+always the allocated core count, and memory costs you only by forcing that count
+up. Verified: the formula reproduces each partition's own TRES billing= exactly.
+
+Then `scontrol show job` arrived and settled the rest:
+
+(Counts below are per-snapshot and drift between dumps -- the ratios are what to
+remember, and the page prints the live numbers.)
+
+NumCPUs is the count the factor was computed from -- but only for RUNNING jobs
+(sprio lists them because of CALCULATE_RUNNING). Score those: 95-98% exact and
+100% within one point, N=104-105. For PENDING jobs NumCPUs is just the request,
+identical to squeue's %C, and nothing reproduces the factor: NumCPUs alone 62%,
+plus the allocation rules 70%. The scheduler is costing a projected allocation
+that no dump reports. Stop trying.
+
+Allocation: NumCPUs = max(requested, ceil(mem/MaxMemPerCPU), gpus x DefCpuPerGPU)
+at ~99% of running jobs -- BUT DefCpuPerGPU only applies when --cpus-per-task is
+unset (an explicit one wins, however small). Applying it always was wrong for
+about 1 job in 20. MaxMemPerCPU is what actually binds, ~3 of every 4.
+
+Billing: MAX_TRES verified against SLURM's own numbers -- reproduces every
+partition's TRES billing= and every running job's AllocTRES billing= exactly. And
+the earlier claim was right but for a subtler reason than I had: the *allocated*
+billing is the core count for every running job, because MaxMemPerCPU raises the
+cores until they cover the memory. A PENDING job's ReqTRES billing can be
+memory-driven since that is computed before the allocation absorbs it.
+
+Age counts from AccrueTime, not SubmitTime. Consistently ~1 pending job in 8 has
+no AccrueTime (all dependency-held) -- they earn no age priority at all and will
+not climb the queue however long they sit. Only a handful have eligible != submit,
+but some differ by 7 days, so it matters per job even though the median barely
+moves.
+
+Also fixed while in there: AssocGrpCPUMinutesLimit contains "GrpCPU", so the
+blocking-reason matcher read it as a cap on CPUs held at once and paired it with an
+unrelated QOS cpu=3360. It is a GrpTRESMins budget. Minutes reasons are now their
+own kind; the consumed budget is in none of the dumps (sshare's RawUsage is one
+weighted number, not per TRES), and the page says so.
+
+The web page reads the config when present and falls back to fitting; see
+`web/plan.js`.
+
