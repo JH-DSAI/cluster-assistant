@@ -166,6 +166,8 @@ async function load({ slow = slowTexts === null } = {}) {
   renderFilters();
   renderPlanForm();
   render();
+  // renderFilters() always unhides the bar; the plan tab has no use for it.
+  document.getElementById("filters").hidden = state.tab === "plan";
   main.dataset.busy = "0";
 }
 
@@ -256,9 +258,10 @@ function legend(entries) {
     .join("")}</div>`;
 }
 
-function segments(parts, widthPct = 100) {
+function segments(parts, widthPct = 100, extraClass = "") {
+  const cls = extraClass ? ` ${extraClass}` : "";
   const total = parts.reduce((t, p) => t + p.value, 0);
-  if (!total) return `<div class="bar" style="width:${widthPct}%"><span class="track"></span></div>`;
+  if (!total) return `<div class="bar${cls}" style="width:${widthPct}%"><span class="track"></span></div>`;
   const segs = parts
     .filter((p) => p.value > 0)
     .map(
@@ -266,7 +269,7 @@ function segments(parts, widthPct = 100) {
         `<span class="seg" style="flex:${p.value};--c:${p.color}" data-tip="${esc(p.tip)}"><i></i></span>`,
     )
     .join("");
-  return `<div class="bar" style="width:${widthPct}%">${segs}</div>`;
+  return `<div class="bar${cls}" style="width:${widthPct}%">${segs}</div>`;
 }
 
 function nodeTip(p, group) {
@@ -363,36 +366,44 @@ function capacityCard(parts) {
               `<td class="num dim">${p.memoryMB ? `${n(Math.round(p.memoryMB / 1024))} GB` : "-"}</td></tr>`,
           )
           .join("")}</tbody></table></div>`
-      : `<div class="rows">${withCpus
-          .map(
-            (p) =>
-              `<div class="row"><div class="row-label">${esc(p.name)}</div>` +
-              segments(
-                kinds
-                  .filter((k) => p.cpu[k] > 0)
-                  .map((k) => ({
-                    value: p.cpu[k],
-                    color: CPU_COLOR[k],
-                    tip:
-                      `${p.name} · ${CPU_LABEL[k]}: ${n(p.cpu[k])} of ${n(p.cpu.total)} CPUs (${(
-                        (p.cpu[k] / p.cpu.total) *
-                        100
-                      ).toFixed(0)}%)` +
-                      (p.gpuTotal
-                        ? `\n${n(p.runningGpus)} of ${n(p.gpuTotal)} ${p.gpuModel ?? ""} GPUs in use` +
-                          (p.gpuUnavail ? `, ${n(p.gpuUnavail)} on unavailable nodes` : "")
-                        : "") +
-                      (p.memoryMB ? `\n${n(Math.round(p.memoryMB / 1024))} GB per node` : ""),
-                  })),
-              ) +
+      : `<div class="rows rows-split">
+          <div class="row-label head-cell"></div><div class="col-head head-cell">Cores</div><div class="col-head gpu-bar head-cell">GPUs</div><div class="head-cell"></div>
+          ${withCpus
+          .map((p) => {
+            const cpuSegs = kinds
+              .filter((k) => p.cpu[k] > 0)
+              .map((k) => ({
+                value: p.cpu[k],
+                color: CPU_COLOR[k],
+                tip:
+                  `${p.name} · ${CPU_LABEL[k]}: ${n(p.cpu[k])} of ${n(p.cpu.total)} CPUs (${(
+                    (p.cpu[k] / p.cpu.total) *
+                    100
+                  ).toFixed(0)}%)` + (p.memoryMB ? `\n${n(Math.round(p.memoryMB / 1024))} GB per node` : ""),
+              }));
+            const gpuValues = { alloc: p.runningGpus, idle: gpuFree(p), other: p.gpuUnavail };
+            const gpuSegs = kinds
+              .filter((k) => gpuValues[k] > 0)
+              .map((k) => ({
+                value: gpuValues[k],
+                color: CPU_COLOR[k],
+                tip: `${p.name} · ${CPU_LABEL[k]}: ${n(gpuValues[k])} of ${n(p.gpuTotal)} ${
+                  p.gpuModel ?? ""
+                } GPUs (${((gpuValues[k] / p.gpuTotal) * 100).toFixed(0)}%)`,
+              }));
+            return (
+              `<div class="row-label">${esc(p.name)}</div>` +
+              segments(cpuSegs) +
+              (p.gpuTotal
+                ? segments(gpuSegs, 100, "gpu-bar")
+                : `<div class="bar gpu-bar"><span class="none">no GPUs</span></div>`) +
               `<div class="row-value"><b>${n(p.cpu.idle)}</b> of ${n(p.cpu.total)} cores free${
-                p.gpuTotal
-                  ? ` · ${n(gpuFree(p))} of ${n(p.gpuTotal)} GPUs`
-                  : ""
-              }</div></div>`,
-          )
+                p.gpuTotal ? ` · ${n(gpuFree(p))} of ${n(p.gpuTotal)} GPUs` : ""
+              }</div>`
+            );
+          })
           .join("")}</div>
-        <p class="axis-note">Each bar is one partition's cores, from <code>sinfo</code>'s CPUS(A/I/O/T) column. <em>Unavailable</em> is cores on drained, down or maintenance nodes. GPU counts are the configured total per partition against what running jobs hold — ${
+        <p class="axis-note">Each left bar is one partition's cores, from <code>sinfo</code>'s CPUS(A/I/O/T) column; each right bar is that partition's GPUs, using the same allocated/idle/unavailable colours. <em>Unavailable</em> is on drained, down or maintenance nodes. GPU counts are the configured total per partition against what running jobs hold — ${
           model.notes.hasJobDetail
             ? "taken from each job's <code>AllocTRES</code>, which is the allocation itself"
             : "derived from what they request, so a GPU held by an idle allocation is not counted and the figure is a floor"
@@ -1431,11 +1442,9 @@ function render() {
   const parts = scopedPartitions();
   renderFreshness();
   document.getElementById("main").innerHTML =
-    kpiRow(parts) +
-    nodesCard(parts) +
-    capacityCard(parts) +
+    kpiRow(parts) + nodesCard(parts) + capacityCard(parts) + queueCard(parts);
+  document.getElementById("details-main").innerHTML =
     problemCard(parts) +
-    queueCard(parts) +
     limitsCard(parts) +
     ceilingCard() +
     historyCard() +
@@ -1603,7 +1612,11 @@ function renderPlanForm() {
   );
   fillSelect(
     planForm.elements.account,
-    [...model.accounts].sort((a, b) => a.account.localeCompare(b.account)).map((a) => [a.account, a.account]),
+    [
+      ["", "(default)"],
+      ...[...model.accounts].sort((a, b) => a.account.localeCompare(b.account)).map((a) => [a.account, a.account]),
+    ],
+    "",
   );
   fillGpuModels();
   fillQos();
@@ -2052,6 +2065,8 @@ function switchTab(tab) {
   }
   document.getElementById("view-status").hidden = tab !== "status";
   document.getElementById("view-plan").hidden = tab !== "plan";
+  document.getElementById("view-details").hidden = tab !== "details";
+  document.getElementById("filters").hidden = tab === "plan" || !model;
 }
 
 // ---------------------------------------------------------------- events
@@ -2083,7 +2098,7 @@ document.addEventListener("pointerout", (e) => {
   if (e.target.closest("[data-tip]")) tip.dataset.show = "0";
 });
 
-document.getElementById("main").addEventListener("click", (e) => {
+function onCardClick(e) {
   const view = e.target.closest("[data-view]");
   if (view) {
     state.views[view.dataset.view] = view.dataset.mode;
@@ -2096,7 +2111,9 @@ document.getElementById("main").addEventListener("click", (e) => {
     state.expanded.has(key) ? state.expanded.delete(key) : state.expanded.add(key);
     render();
   }
-});
+}
+document.getElementById("main").addEventListener("click", onCardClick);
+document.getElementById("details-main").addEventListener("click", onCardClick);
 
 for (const btn of document.querySelectorAll("[data-tab]")) {
   btn.addEventListener("click", () => switchTab(btn.dataset.tab));

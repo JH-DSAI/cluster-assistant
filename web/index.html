@@ -31,20 +31,23 @@
         <button role="tab" id="tab-plan" data-tab="plan" aria-selected="false" aria-controls="view-plan">
           Plan a job
         </button>
+        <button role="tab" id="tab-details" data-tab="details" aria-selected="false" aria-controls="view-details">
+          Cluster details
+        </button>
       </nav>
 
       <div id="errors"></div>
 
-      <section id="view-status" role="tabpanel" aria-labelledby="tab-status">
-        <div class="filters" id="filters" hidden>
-          <label for="f-part">Partition</label>
-          <select id="f-part"></select>
-          <label for="f-user">User</label>
-          <input type="search" id="f-user" placeholder="e.g. xwang378" />
-          <button id="f-clear">Clear</button>
-          <span class="filter-note" id="filter-note"></span>
-        </div>
+      <div class="filters" id="filters" hidden>
+        <label for="f-part">Partition</label>
+        <select id="f-part"></select>
+        <label for="f-user">User</label>
+        <input type="search" id="f-user" placeholder="e.g. xwang378" />
+        <button id="f-clear">Clear</button>
+        <span class="filter-note" id="filter-note"></span>
+      </div>
 
+      <section id="view-status" role="tabpanel" aria-labelledby="tab-status">
         <main id="main"></main>
       </section>
 
@@ -163,6 +166,10 @@
 
           <div id="plan-out"></div>
         </div>
+      </section>
+
+      <section id="view-details" role="tabpanel" aria-labelledby="tab-details" hidden>
+        <main id="details-main"></main>
       </section>
     </div>
 

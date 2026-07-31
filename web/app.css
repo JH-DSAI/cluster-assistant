@@ -649,6 +649,26 @@ h2 {
   min-width: 0;
 }
 
+/* Cores/GPUs split: cells are direct grid children (not one grid per row) so
+   every row shares the same column tracks and the divider lines up exactly. */
+.rows-split {
+  grid-template-columns: 92px 1fr 1fr auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+
+.rows-split .gpu-bar {
+  border-left: 1px solid var(--grid);
+  padding-left: 10px;
+}
+
+.col-head {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
 .row-value {
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -850,5 +870,19 @@ main[data-busy="1"] {
   .row-value {
     grid-column: 2;
     text-align: right;
+  }
+  .rows-split {
+    grid-template-columns: 70px 1fr;
+  }
+  .rows-split .gpu-bar {
+    grid-column: 1 / -1;
+    border-left: 0;
+    padding-left: 0;
+  }
+  .rows-split .row-value {
+    grid-column: 1 / -1;
+  }
+  .rows-split .head-cell {
+    display: none;
   }
 }
