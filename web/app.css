@@ -454,6 +454,12 @@ select:hover {
   border-radius: 10px;
 }
 
+/* The [hidden] attribute UA rule ties in specificity with .filters above and
+   loses to it in cascade order, so it needs restating here to actually hide. */
+.filters[hidden] {
+  display: none;
+}
+
 .filters label {
   color: var(--text-secondary);
   font-size: 13px;

@@ -261,10 +261,18 @@ the formula reproduces every partition's `TRES billing=` and *every* running job
 `AllocTRES billing=` exactly.
 
 What it comes to is **the allocated core count**, for every running job — because
-`MaxMemPerCPU` raises the core count until it covers the memory, and every
-partition sets it so the memory term lands just under the CPU weight (0.977 per
-core against 1, on all five). So memory is not billed directly; it is billed
-*through* the cores it obliges you to take.
+`MaxMemPerCPU` raises the core count until it covers the memory, and on every
+partition the memory term tops out below the CPU weight of 1, so CPU always wins.
+Where it tops out is not uniform, though: `med`, `b200`, `b300`, `h100` and `h200`
+size `MaxMemPerCPU` and `Mem` together so a maxed-out core carries 0.976–0.977
+points of memory against 1 of CPU — just under. `a100` and `l40s` still run the
+older `MaxMemPerCPU=6000` against the same `Mem=0.0833G` the 12000 MB partitions
+use, so a maxed-out core there carries only 0.488 — a job pinned to the memory
+limit is charged about half as much per GB on those two as the same job would be
+on the rest. The conclusion is unaffected (0.488 is still under 1, so CPU still
+drives the bill everywhere), but the two partitions are not priced the same as
+the other five. Either way, memory is not billed directly; it is billed *through*
+the cores it obliges you to take.
 
 A *pending* job can still show a memory-driven `ReqTRES billing=`, because that
 figure is computed before the allocation absorbs the memory. The planner reports

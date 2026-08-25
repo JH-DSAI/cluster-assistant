@@ -1044,11 +1044,15 @@ function kpiRow(parts) {
  * What MAX_TRES actually means for a job here.
  *
  * With MAX_TRES a node is billed for its largest weighted resource, so which
- * resource that is decides what a job costs. On this cluster every partition
- * sets MaxMemPerCPU such that the memory term tops out just below the CPU
- * weight, which makes the answer the same everywhere: the bill is the core
- * count. That is worth stating, because it means memory is not free — it costs
- * by forcing the core count up, not by being billed directly.
+ * resource that is decides what a job costs. On every partition here
+ * MaxMemPerCPU tops the memory term out below the CPU weight of 1, so CPU
+ * always wins — but not by the same margin everywhere: med/b200/b300/h100/h200
+ * size it to 0.976-0.977, just under; a100 and l40s still pair MaxMemPerCPU=6000
+ * with the same Mem weight the 12000 MB partitions use, so a maxed-out core
+ * there carries only 0.488 — about half the memory cost per core. The bill is
+ * the core count on every partition either way, which is what is checked below;
+ * it means memory is not free — it costs by forcing the core count up, not by
+ * being billed directly.
  */
 function billingShapeNote() {
   const jobs = model.jobDetail ?? [];
