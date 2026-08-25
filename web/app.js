@@ -1690,7 +1690,14 @@ function renderPlanForm() {
   );
   if (!accountSeeded) {
     accountSeeded = true;
-    if (accountNames.includes(DEFAULT_ACCOUNT)) planForm.elements.account.value = DEFAULT_ACCOUNT;
+    if (accountNames.includes(DEFAULT_ACCOUNT)) {
+      planForm.elements.account.value = DEFAULT_ACCOUNT;
+      // Seeding the value alone leaves the tick box (and every account-gated
+      // read in readPlanForm) blind to it — flip it on so the select isn't
+      // stuck disabled and the rest of the planner actually sees the account.
+      const box = optBoxes.get("account");
+      if (box) box.checked = true;
+    }
   }
   fillGpuModels();
   fillQos();
