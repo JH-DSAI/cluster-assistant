@@ -25,7 +25,6 @@ import {
   toRequest,
   preambleDefaults,
   PREAMBLE_OPTIONS,
-  OTHER_FACTORS,
 } from "./plan.js";
 
 const FILES = {
@@ -1714,7 +1713,6 @@ const LEVEL_COLOR = {
   warn: "var(--status-warning)",
   bad: "var(--status-critical)",
 };
-const LEVEL_WORD = { ok: "ok", info: "adjusted", note: "note", warn: "will wait", bad: "blocked" };
 
 /**
  * The submit script drawer at the foot of the planner: the `#SBATCH` preamble
@@ -1740,38 +1738,6 @@ function planMetaLine(part, req) {
   return `${part?.name ?? "no partition"} · ${esc(acct)} · ${n(pending)} pending · ${src}`;
 }
 
-/**
- * Where a freshly submitted job would land against the partition's live
- * queue: everyone else's priority, sampled down to a bar chart, with this
- * job's own estimate picked out.
- */
-function queueBars(part, start) {
-  const values = (part?.queue ?? []).map((r) => r.priority).filter((v) => v > 0);
-  if (values.length < 2) return "";
-  const withYou = [...values, start].sort((a, b) => a - b);
-  const cap = 30;
-  const step = Math.max(1, Math.ceil(withYou.length / cap));
-  const sampled = [];
-  for (let i = 0; i < withYou.length; i += step) sampled.push(withYou[i]);
-  if (sampled.at(-1) !== withYou.at(-1)) sampled.push(withYou.at(-1));
-  const max = Math.max(1, ...withYou);
-  // The sample can bucket several priorities together, so "you" marks
-  // whichever bar ended up closest rather than an exact value.
-  let closest = 0;
-  for (let i = 1; i < sampled.length; i++) {
-    if (Math.abs(sampled[i] - start) < Math.abs(sampled[closest] - start)) closest = i;
-  }
-  const bars = sampled
-    .map(
-      (v, i) =>
-        `<span class="${i === closest ? "you" : ""}" style="height:${Math.max(3, (v / max) * 100)}%" data-tip="${esc(
-          i === closest ? `this job: ${n(start)}` : `${n(v)}`,
-        )}"></span>`,
-    )
-    .join("");
-  return `<div class="qbars">${bars}</div><div class="qbars-axis"><span>oldest</span><span>you</span><span>newest</span></div>`;
-}
-
 function feasibilityCard(req, part) {
   const checks = feasibility(req, part, model, prioModel);
   const bad = checks.filter((c) => c.level === "bad");
@@ -1782,26 +1748,50 @@ function feasibilityCard(req, part) {
       ? ["warn", "Valid, but it will have to wait"]
       : ["ok", "Valid, and the capacity is free right now"];
 
-  return `<div class="card"><div class="card-head"><h2>Will it run?</h2>
+  const feasTip = `Checked against ${
+    model.notes.hasPartitionInfo
+      ? "the partition's configured limits, what sinfo reports each node holds, and the QOS caps"
+      : "what sinfo reports each node holds and the caps in sacct_qos.txt"
+  }.`;
+
+  // Every level collapses into one of three buckets: a hard stop, a silent
+  // adjustment (applied or just noted), and everything else that passed —
+  // "will wait" is still a check that passed, just not instantly.
+  const GROUPS = [
+    { title: "Blocked", color: LEVEL_COLOR.bad, levels: ["bad"] },
+    { title: "OK", color: LEVEL_COLOR.ok, levels: ["ok", "warn"] },
+    { title: "Adjusted", color: LEVEL_COLOR.info, levels: ["info", "note"] },
+  ];
+
+  const groups = GROUPS.map((g) => ({ ...g, items: checks.filter((c) => g.levels.includes(c.level)) })).filter(
+    (g) => g.items.length,
+  );
+
+  return `<div class="card"><div class="card-head"><h2>Will it run?</h2><span class="tip-icon" data-tip="${esc(
+    feasTip,
+  )}">?</span>
       <span class="chip" style="--c:${LEVEL_COLOR[verdict[0]]}"><i class="dot"></i>${esc(verdict[1])}</span></div>
-    <p class="card-sub">Checked against ${
-      model.notes.hasPartitionInfo
-        ? "the partition's configured limits, what <code>sinfo</code> reports each node holds, and the QOS caps"
-        : "what <code>sinfo</code> reports each node holds and the caps in <code>sacct_qos.txt</code>"
-    }.</p>
-    <ul class="checks-list">${checks
+    ${groups
       .map(
-        (c) =>
-          `<li><span class="chip" style="--c:${LEVEL_COLOR[c.level]}"><i class="dot"></i>${esc(
-            LEVEL_WORD[c.level],
-          )}</span><span><b>${esc(c.label)}</b> — ${esc(c.text)}</span></li>`,
+        (g) => `<details class="feas-group">
+      <summary class="feas-group-head"><span class="chip" style="--c:${g.color}"><i class="dot"></i>${esc(
+        g.title,
+      )}</span><span class="feas-count">${n(g.items.length)}</span></summary>
+      <ul class="checks-list">${g.items
+        .map(
+          (c) =>
+            `<li><b>${esc(c.label)}</b><span class="tip-icon" data-tip="${esc(c.text)}">?</span></li>`,
+        )
+        .join("")}</ul>
+    </details>`,
       )
-      .join("")}</ul>
+      .join("")}
+    <details class="tech-notes"><summary>Technical notes</summary>
     <p class="axis-note">${
       model.notes.hasPartitionInfo
         ? `Limits come from <code>scontrol show partition</code>, so <code>MaxNodes</code>, <code>MaxTime</code>, <code>MaxCPUsPerNode</code>, <code>MaxMemPerCPU</code>, <code>AllowAccounts</code>/<code>AllowQos</code> and the partition's own QOS are all checked. What is still not checked is anything set on your association — <code>MaxJobs</code>, <code>GrpTRES</code> — and whether the nodes free right now are the ones that fit.`
         : `A partition's <em>own</em> limits — <code>MaxNodes</code>, <code>MaxTime</code>, <code>MaxMemPerNode</code>, the QOS it attaches — are in none of these dumps, so a request can still be rejected by something not checked here. <code>scontrol -o show partition</code> would close that gap.`
-    }</p></div>`;
+    }</p></details></div>`;
 }
 
 function costCard(req, part) {
@@ -1827,22 +1817,30 @@ function costCard(req, part) {
   const over = `${dur(req.minutes * 60)}${req.tasks > 1 ? ` × ${n(req.tasks)} tasks` : ""}`;
   const plural = (v, word) => `${n(v)} ${word}${v === 1 ? "" : "s"}`;
 
-  return `<div class="card"><div class="card-head"><h2>Cost of the whole run</h2></div>
-    <p class="card-sub">What the job commits if it runs to its full walltime — each figure is the whole run, not the rate while it runs. These are the same TRES-minutes that <code>GrpTRESMins</code> caps and <code>sshare</code> reports as in flight.</p>
-    <div class="kpis plan-kpis">
-      ${
-        bill
-          ? tile(
-              "Billing-hours",
-              n(Math.round(billTotal / 60)),
-              `${plural(Math.round(bill.total), "unit")} held × ${over} = ${n(
-                Math.round(billTotal),
-              )} billing-minutes`,
-            )
-          : ""
-      }
+  const costTip =
+    "What the job commits if it runs to its full walltime — each figure is the whole run, not the rate while it runs. These are the same TRES-minutes that GrpTRESMins caps and sshare reports as in flight.";
+
+  const topTiles = [
+    bill
+      ? tile(
+          "Billing-hours",
+          n(Math.round(billTotal / 60)),
+          `${plural(Math.round(bill.total), "unit")} held × ${over} = ${n(
+            Math.round(billTotal),
+          )} billing-minutes`,
+        )
+      : "",
+    req.gpus ? tile("GPU-hours", n(Math.round(total.gpuHours)), `${plural(req.gpus, "GPU")} × ${over}`) : "",
+  ]
+    .filter(Boolean)
+    .join("");
+
+  return `<div class="card"><div class="card-head"><h2>Cost of the whole run</h2><span class="tip-icon" data-tip="${esc(
+    costTip,
+  )}">?</span></div>
+    ${topTiles ? `<div class="kpis plan-kpis">${topTiles}</div>` : ""}
+    <div class="kpis plan-kpis cost-line">
       ${tile("CPU-hours", n(Math.round(total.cpuHours)), `${plural(req.cpus, "core")} × ${over}`)}
-      ${req.gpus ? tile("GPU-hours", n(Math.round(total.gpuHours)), `${plural(req.gpus, "GPU")} × ${over}`) : ""}
       ${tile(
         "Node-hours",
         n(Math.round(total.nodeHours * 10) / 10),
@@ -1894,6 +1892,7 @@ function costCard(req, part) {
           </tbody></table></div>`
         : `<p class="axis-note">No <code>sshare</code> row for <b>${esc(req.account || "this account")}</b>, so its remaining allowance is unknown.</p>`
     }
+    <details class="tech-notes"><summary>Technical notes</summary>
     ${bill ? billingNote(bill, part, req) : ""}
     <p class="axis-note">${
       shareCpu !== null
@@ -1909,7 +1908,7 @@ function costCard(req, part) {
       bill
         ? ""
         : `This is resource-time, not <em>billing</em>: SLURM charges a weighted combination set per partition by <code>TRESBillingWeights</code>, which <code>scontrol show partition</code> would supply.`
-    }</p></div>`;
+    }</p></details></div>`;
 }
 
 /**
@@ -1981,18 +1980,13 @@ function priorityCardPlan(req, part) {
   const est = estimatePriority(req, part, pm);
   const start = Math.floor(est.start);
   const rank = rankIn(part, start);
+  const queue = part?.queue ?? [];
 
-  const ahead = (part?.queue ?? []).filter((r) => r.priority > start);
+  const ahead = queue.filter((r) => r.priority > start);
   const passable = ahead
     .map((r) => ({ r, t: overtakeSeconds(est.base, r, pm) }))
     .filter((x) => x.t !== null);
   const stuck = ahead.length - passable.length;
-  // Reaching the front by waiting means passing every one of them.
-  const toFront = stuck === 0 && passable.length ? Math.max(...passable.map((x) => x.t)) : null;
-
-  const tile = (label, value, sub) =>
-    `<div class="tile"><div class="tile-label">${esc(label)}</div>
-     <div class="tile-value">${value}</div><div class="tile-sub">${sub}</div></div>`;
 
   // A range whose ends round to the same thing reads as broken, not as precise.
   const span = (xs) => {
@@ -2004,7 +1998,7 @@ function priorityCardPlan(req, part) {
   // Job size spans a few dozen points where age spans thousands, so on a cluster
   // configured this way the queue is very nearly first-in-first-out. Worth
   // saying, because it is the single most useful fact about waiting here.
-  const bases = (part?.queue ?? []).filter((r) => r.factors).map((r) => r.priority - r.factors.age);
+  const bases = queue.filter((r) => r.factors).map((r) => r.priority - r.factors.age);
   const spread = bases.length ? Math.max(...bases) - Math.min(...bases) : 0;
   const fifo = bases.length > 1 && spread < pm.ageWeight / 10;
 
@@ -2016,52 +2010,55 @@ function priorityCardPlan(req, part) {
     [`at the cap (${dur(pm.ageMax)})`, pm.ageMax],
   ];
 
-  const pts = (v) => (v >= 1 ? v.toFixed(2) : v.toFixed(4));
-  const factorRows = [
-    [
-      "jobsize",
-      est.jobsize,
-      `${pts(pm.perNodePoints)} per node × ${n(req.nodes)} + ${pts(pm.perCpuPoints)} per CPU × ${n(req.cpus)}`,
-    ],
-    ["age", 0, `zero at submission; reaches ${n(pm.ageWeight)} after ${dur(pm.ageMax)} of waiting`],
-    ...OTHER_FACTORS.map((f) => [
-      f,
-      est.other[f],
-      est.peers ? `median of ${n(est.peers)} queued job(s) matching ${est.scope}` : "no comparable job queued",
-    ]),
-  ].filter(([f, v]) => v !== 0 || f === "jobsize" || f === "age");
+  const prioTip = `What this job would score the moment you submit it, and where that puts it in ${
+    part?.name ?? "the partition"
+  }'s queue as it stands.`;
 
-  return `<div class="card"><div class="card-head"><h2>Priority at submit</h2></div>
-    <p class="card-sub">What this job would score the moment you submit it, and where that puts it in ${esc(
-      part?.name ?? "the partition",
-    )}'s queue as it stands.</p>
-    <div class="kpis plan-kpis">
-      ${tile("Priority at submit", n(start), "age contributes nothing yet")}
-      ${tile(
-        "Rank in queue",
-        `${n(rank.rank)}<span class="of">/${n(rank.total + 1)}</span>`,
-        `${n(rank.ahead)} pending job(s) ahead of it`,
-      )}
-      ${tile("Priority at the cap", n(Math.floor(est.atCap)), `after ${dur(pm.ageMax)} of waiting`)}
-      ${tile(
-        "Front of queue",
-        toFront === null ? "not by waiting" : esc(dur(toFront)),
-        toFront === null ? `${n(stuck)} job(s) ahead outrank it on more than age` : "if the queue stood still",
-      )}
-    </div>
-    <div class="scroll"><table><thead><tr><th>Factor</th><th class="num">At submit</th><th>Where it comes from</th></tr></thead><tbody>
-      ${factorRows
-        .map(
-          ([f, v, why]) =>
-            `<tr><td>${esc(FACTOR_LABEL[f] ?? f)}</td>` +
-            `<td class="num">${v ? n(Math.round(v * 10) / 10) : '<span class="dim">0</span>'}</td>` +
-            `<td class="dim">${esc(why)}</td></tr>`,
-        )
-        .join("")}
-      <tr><td><b>Total</b></td><td class="num"><b>${n(start)}</b></td>
-        <td class="dim">SLURM floors the sum of the factors, not each one</td></tr>
-    </tbody></table></div>
-    ${queueBars(part, start)}
+  // Up to three rows around the job's slot: one neighbour on each side, or two
+  // on whichever side exists when it lands at either end of the queue.
+  const ins = rank.ahead;
+  let beforeCount, afterCount;
+  if (ins === 0) {
+    beforeCount = 0;
+    afterCount = Math.min(2, queue.length);
+  } else if (ins === queue.length) {
+    beforeCount = Math.min(2, queue.length);
+    afterCount = 0;
+  } else {
+    beforeCount = 1;
+    afterCount = 1;
+  }
+  const beforeRows = queue.slice(ins - beforeCount, ins);
+  const afterRows = queue.slice(ins, ins + afterCount);
+  const previewRows = [
+    ...beforeRows.map((r, i) => ({ r, rankNum: rank.rank - beforeRows.length + i })),
+    { you: true, rankNum: rank.rank },
+    ...afterRows.map((r, i) => ({ r, rankNum: rank.rank + 1 + i })),
+  ];
+
+  const preview = `<div class="qprev">${previewRows
+    .map(
+      (row) =>
+        `<div class="qprev-row${row.you ? " you" : ""}"><span class="num">#${n(row.rankNum)}</span>` +
+        `<span class="job">${
+          row.you ? "This job" : `${esc(row.r.jobid)} <span class="dim">${esc(row.r.user)}</span>`
+        }</span><span class="pri">${n(row.you ? start : row.r.priority)}</span></div>`,
+    )
+    .join("")}</div>${
+    queue.length === 0
+      ? `<p class="axis-note">Nothing else pending in ${esc(part?.name ?? "this partition")}.</p>`
+      : ""
+  }`;
+
+  return `<div class="card"><div class="card-head"><h2>Priority at submit</h2><span class="tip-icon" data-tip="${esc(
+    prioTip,
+  )}">?</span></div>
+    <p class="rank-line">Rank in queue: <b>${n(rank.rank)}</b><span class="of">/${n(
+      rank.total + 1,
+    )}</span> <span class="dim">— ${n(rank.ahead)} pending job(s) ahead of it</span></p>
+    <details class="tech-notes"><summary>Preview Queue Placement</summary>
+    ${preview}</details>
+    <details class="tech-notes"><summary>Technical notes</summary>
     <p class="axis-note">Priority over time: ${growth
       .map(([label, s]) => `${esc(label)} <b>${n(at(s))}</b>`)
       .join(" · ")}.</p>
@@ -2092,7 +2089,7 @@ function priorityCardPlan(req, part) {
         ? `Each of the ${n(req.tasks)} array tasks is scheduled separately and starts with this same priority. `
         : ""
     }</p>
-    ${modelNote()}</div>`;
+    ${modelNote()}</details></div>`;
 }
 
 // Where the weights came from, stated rather than assumed — the page has no
@@ -2154,7 +2151,7 @@ function renderPlan() {
   // on what was typed — the partition can force the core count up, and fills in
   // the memory and the walltime for a request that names neither.
   const req = effectiveRequest(toRequest(f), part);
-  out.innerHTML = costCard(req, part) + priorityCardPlan(req, part) + feasibilityCard(req, part);
+  out.innerHTML = costCard(req, part) + feasibilityCard(req, part) + priorityCardPlan(req, part);
   renderDrawer(f);
   meta.textContent = planMetaLine(part, req);
 }

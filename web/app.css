@@ -480,6 +480,59 @@ select:hover {
   margin-bottom: 10px;
 }
 
+.tip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: help;
+}
+
+/* Forces these three onto one row even in the narrow sidebar, instead of
+   wrapping per auto-fit's usual minmax. */
+.kpis.plan-kpis.cost-line {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.tech-notes {
+  margin-top: 10px;
+  border-top: 1px solid var(--grid);
+  padding-top: 2px;
+}
+
+.tech-notes summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 6px 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.tech-notes summary::-webkit-details-marker {
+  display: none;
+}
+
+.tech-notes summary::before {
+  content: "▸ ";
+  font-family: ui-monospace, monospace;
+}
+
+.tech-notes[open] summary::before {
+  content: "▾ ";
+}
+
+.tech-notes .axis-note:last-child {
+  margin-bottom: 0;
+}
+
 .plan-side table {
   font-size: 11.5px;
 }
@@ -511,6 +564,42 @@ select:hover {
   font-size: 22px;
 }
 
+.feas-group {
+  margin-bottom: 4px;
+}
+
+.feas-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.feas-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.feas-group-head::before {
+  content: "▸ ";
+  font-family: ui-monospace, monospace;
+  color: var(--muted);
+}
+
+.feas-group[open] .feas-group-head::before {
+  content: "▾ ";
+}
+
+.feas-group-head .chip {
+  font-size: 11px;
+}
+
+.feas-count {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .checks-list {
   list-style: none;
   margin: 0;
@@ -519,15 +608,12 @@ select:hover {
   color: var(--text-secondary);
 }
 
-/* Two columns, so a long explanation wraps under itself rather than under the
-   status chip. */
 .checks-list li {
-  padding: 6px 0;
+  padding: 5px 0;
   border-bottom: 1px solid var(--grid);
-  display: grid;
-  grid-template-columns: 70px minmax(0, 1fr);
-  gap: 8px;
-  align-items: baseline;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .checks-list li b {
@@ -535,35 +621,64 @@ select:hover {
   font-weight: 600;
 }
 
-.checks-list .chip {
-  font-size: 11px;
+.rank-line {
+  font-size: 13px;
+  margin: 0 0 12px;
 }
 
-/* Priority queue position: oldest, this job, newest. */
-.qbars {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 40px;
-  margin-top: 10px;
+.rank-line b {
+  font-weight: 700;
 }
 
-.qbars span {
-  flex: 1;
-  display: block;
-  background: var(--grid);
-}
-
-.qbars span.you {
-  background: var(--accent);
-}
-
-.qbars-axis {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
+.rank-line .of {
   color: var(--muted);
-  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+/* Up to three rows: the job's slot in the queue, and whichever neighbours
+   exist on either side of it. */
+.qprev {
+  font-size: 11.5px;
+}
+
+.qprev-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--grid);
+}
+
+.qprev-row:last-child {
+  border-bottom: 0;
+}
+
+.qprev-row .num {
+  color: var(--muted);
+  width: 26px;
+  flex: none;
+}
+
+.qprev-row .job {
+  flex: 1;
+  min-width: 0;
+}
+
+.qprev-row .pri {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.qprev-row.you {
+  background: var(--wash);
+  font-weight: 600;
+  margin: 0 -4px;
+  padding: 5px 4px;
+}
+
+.qprev-row.you .pri {
+  color: var(--text-primary);
 }
 
 /* ---- submit script drawer ---- */
