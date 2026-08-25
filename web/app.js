@@ -1756,36 +1756,47 @@ function feasibilityCard(req, part) {
 
   // Every level collapses into one of three buckets: a hard stop, a silent
   // adjustment (applied or just noted), and everything else that passed —
-  // "will wait" is still a check that passed, just not instantly.
+  // "will wait" is still a check that passed, just not instantly. Each
+  // bucket is a table column that expands independently, so its rows stay
+  // open across re-renders instead of resetting on every keystroke.
   const GROUPS = [
-    { title: "Blocked", color: LEVEL_COLOR.bad, levels: ["bad"] },
-    { title: "OK", color: LEVEL_COLOR.ok, levels: ["ok", "warn"] },
-    { title: "Adjusted", color: LEVEL_COLOR.info, levels: ["info", "note"] },
+    { key: "blocked", title: "Blocked", color: LEVEL_COLOR.bad, levels: ["bad"] },
+    { key: "ok", title: "OK", color: LEVEL_COLOR.ok, levels: ["ok", "warn"] },
+    { key: "adjusted", title: "Adjusted", color: LEVEL_COLOR.info, levels: ["info", "note"] },
   ];
 
-  const groups = GROUPS.map((g) => ({ ...g, items: checks.filter((c) => g.levels.includes(c.level)) })).filter(
-    (g) => g.items.length,
-  );
+  const groups = GROUPS.map((g) => ({
+    ...g,
+    items: checks.filter((c) => g.levels.includes(c.level)),
+    open: state.expanded.has(`feas-${g.key}`),
+  }));
+  const rowCount = Math.max(0, ...groups.map((g) => (g.open ? g.items.length : 0)));
+  const rows = Array.from(
+    { length: rowCount },
+    (_, i) =>
+      `<tr>${groups
+        .map((g) => {
+          const c = g.open ? g.items[i] : null;
+          return `<td>${c ? `<b>${esc(c.label)}</b><span class="tip-icon" data-tip="${esc(c.text)}">?</span>` : ""}</td>`;
+        })
+        .join("")}</tr>`,
+  ).join("");
 
   return `<div class="card"><div class="card-head"><h2>Will it run?</h2><span class="tip-icon" data-tip="${esc(
     feasTip,
   )}">?</span>
       <span class="chip" style="--c:${LEVEL_COLOR[verdict[0]]}"><i class="dot"></i>${esc(verdict[1])}</span></div>
-    ${groups
+    <table class="feas-table"><thead><tr>${groups
       .map(
-        (g) => `<details class="feas-group">
-      <summary class="feas-group-head"><span class="chip" style="--c:${g.color}"><i class="dot"></i>${esc(
-        g.title,
-      )}</span><span class="feas-count">${n(g.items.length)}</span></summary>
-      <ul class="checks-list">${g.items
-        .map(
-          (c) =>
-            `<li><b>${esc(c.label)}</b><span class="tip-icon" data-tip="${esc(c.text)}">?</span></li>`,
-        )
-        .join("")}</ul>
-    </details>`,
+        (g) =>
+          `<th class="feas-col-head${g.open ? " open" : ""}"${
+            g.items.length ? ` data-expand="feas-${g.key}"` : ""
+          }><span class="chip" style="--c:${g.color}"><i class="dot"></i>${esc(
+            g.title,
+          )}</span><span class="feas-count">${n(g.items.length)}</span></th>`,
       )
-      .join("")}
+      .join("")}</tr></thead>
+    <tbody>${rows}</tbody></table>
     <details class="tech-notes"><summary>Technical notes</summary>
     <p class="axis-note">${
       model.notes.hasPartitionInfo
@@ -2207,11 +2218,12 @@ function onCardClick(e) {
   if (exp) {
     const key = exp.dataset.expand;
     state.expanded.has(key) ? state.expanded.delete(key) : state.expanded.add(key);
-    render();
+    e.target.closest("#plan-out") ? renderPlan() : render();
   }
 }
 document.getElementById("main").addEventListener("click", onCardClick);
 document.getElementById("details-main").addEventListener("click", onCardClick);
+document.getElementById("plan-out").addEventListener("click", onCardClick);
 
 for (const btn of document.querySelectorAll("[data-tab]")) {
   btn.addEventListener("click", () => switchTab(btn.dataset.tab));

@@ -564,61 +564,54 @@ select:hover {
   font-size: 22px;
 }
 
-.feas-group {
-  margin-bottom: 4px;
+.feas-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
 }
 
-.feas-group-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 0;
+.feas-col-head {
+  text-align: left;
+  padding: 6px 8px 6px 0;
+  vertical-align: middle;
+}
+
+.feas-col-head[data-expand] {
   cursor: pointer;
-  list-style: none;
 }
 
-.feas-group-head::-webkit-details-marker {
-  display: none;
-}
-
-.feas-group-head::before {
+.feas-col-head[data-expand]::before {
   content: "▸ ";
   font-family: ui-monospace, monospace;
   color: var(--muted);
 }
 
-.feas-group[open] .feas-group-head::before {
+.feas-col-head.open::before {
   content: "▾ ";
 }
 
-.feas-group-head .chip {
+.feas-col-head .chip {
   font-size: 11px;
 }
 
 .feas-count {
   color: var(--muted);
   font-size: 11px;
+  margin-left: 4px;
 }
 
-.checks-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.feas-table td {
+  padding: 5px 8px 5px 0;
+  border-bottom: 1px solid var(--grid);
   font-size: 12px;
   color: var(--text-secondary);
+  vertical-align: top;
 }
 
-.checks-list li {
-  padding: 5px 0;
-  border-bottom: 1px solid var(--grid);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.checks-list li b {
+.feas-table td b {
   color: var(--text-primary);
   font-weight: 600;
+  margin-right: 4px;
 }
 
 .rank-line {
