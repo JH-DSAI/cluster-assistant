@@ -22,7 +22,6 @@ import {
   accountHeadroom,
   feasibility,
   sbatchPreamble,
-  timeSpec,
   toRequest,
   preambleDefaults,
   PREAMBLE_OPTIONS,
@@ -116,6 +115,34 @@ const size = (r) =>
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
+// scontrol_partition.txt's AllowAccounts, shown beside the name so users can
+// tell at a glance which partitions their account may use. Account names are
+// SLURM logins (lowercase); this is how they're styled for display.
+const ACCOUNT_LABEL = { jhu: "JHU" };
+const formatAccount = (a) => ACCOUNT_LABEL[a] ?? a.charAt(0).toUpperCase() + a.slice(1);
+const partAccounts = (p) =>
+  p.info?.allowAccounts?.length ? p.info.allowAccounts.map(formatAccount).join(", ") : "All";
+const partLabel = (p) => `${p.name} (${partAccounts(p)})`;
+
+// f-part filter values that stand for a group of partitions rather than one:
+// every partition restricted to that account, plus every partition open to
+// all accounts (AllowAccounts=ALL parses to a null allowAccounts).
+const GROUP_FILTERS = {
+  "group:jhu": { account: "jhu", label: "All JHU", scopeLabel: "Every JHU partition here" },
+  "group:schmidt": { account: "schmidt", label: "All Schmidt", scopeLabel: "Every Schmidt partition here" },
+};
+const partitionInGroup = (p, account) => {
+  const allow = p.info?.allowAccounts;
+  return !allow || allow.includes(account);
+};
+// Resolves the current filter to the set of real partition names it covers,
+// or null for "all" (every partition, no filtering needed).
+function scopedPartitionNames() {
+  const g = GROUP_FILTERS[state.partition];
+  if (g) return new Set(model.partitions.filter((p) => partitionInGroup(p, g.account)).map((p) => p.name));
+  return state.partition === "all" ? null : new Set([state.partition]);
+}
+
 const state = {
   tab: "status",
   partition: "all",
@@ -193,7 +220,8 @@ const matchUser = (user, q) => {
 
 function scopedPartitions() {
   const u = state.user.trim().toLowerCase();
-  const parts = model.partitions.filter((p) => state.partition === "all" || p.name === state.partition);
+  const names = scopedPartitionNames();
+  const parts = model.partitions.filter((p) => names === null || names.has(p.name));
   if (!u) return parts;
   // Ranks come from the unfiltered sort, so a filtered row still shows the
   // job's true position in that partition's queue.
@@ -215,9 +243,10 @@ function scopedPartitions() {
 
 function scopedJobs() {
   const u = state.user.trim().toLowerCase();
+  const names = scopedPartitionNames();
   return model.jobs.filter(
     (j) =>
-      (state.partition === "all" || j.partitions.includes(state.partition)) &&
+      (names === null || j.partitions.some((p) => names.has(p))) &&
       (!u || matchUser(j.user, u)),
   );
 }
@@ -226,13 +255,16 @@ function scopedJobs() {
 
 function renderFilters() {
   const sel = document.getElementById("f-part");
-  const opts = ['<option value="all">All partitions</option>'].concat(
-    model.partitions.map(
-      (p) => `<option value="${esc(p.name)}">${esc(p.name)}${p.isDefault ? " (default)" : ""}</option>`,
-    ),
-  );
+  const opts = ['<option value="all">All partitions</option>']
+    .concat(Object.entries(GROUP_FILTERS).map(([value, g]) => `<option value="${value}">${esc(g.label)}</option>`))
+    .concat(
+      model.partitions.map(
+        (p) => `<option value="${esc(p.name)}">${esc(partLabel(p))}${p.isDefault ? " (default)" : ""}</option>`,
+      ),
+    );
   sel.innerHTML = opts.join("");
-  sel.value = model.partitions.some((p) => p.name === state.partition) ? state.partition : "all";
+  const valid = GROUP_FILTERS[state.partition] || model.partitions.some((p) => p.name === state.partition);
+  sel.value = valid ? state.partition : "all";
   state.partition = sel.value;
   document.getElementById("f-user").value = state.user;
   document.getElementById("filters").hidden = false;
@@ -294,7 +326,7 @@ function nodeTip(p, group) {
   const flags = [...new Set(rows.flatMap((r) => [...r.flags]))].map((f) => FLAG_LABEL[f] ?? f);
   const reasons = [...new Set(rows.map((r) => r.reason).filter(Boolean))];
   return (
-    `${p.name} · ${GROUP_LABEL[group]}: ${n(p.byGroup[group])} of ${n(p.nodes)} nodes\n` +
+    `${partLabel(p)} · ${GROUP_LABEL[group]}: ${n(p.byGroup[group])} of ${n(p.nodes)} nodes\n` +
     `sinfo state: ${states}` +
     (flags.length ? ` (${flags.join(", ")})` : "") +
     (reasons.length ? `\n${reasons.join(" / ")}` : "") +
@@ -314,7 +346,7 @@ function nodesCard(parts) {
           .join("")}<th>Time limit</th><th>Avail</th></tr></thead><tbody>${parts
           .map(
             (p) =>
-              `<tr><td>${esc(p.name)}${p.isDefault ? ' <span class="dim">default</span>' : ""}</td>` +
+              `<tr><td>${esc(partLabel(p))}${p.isDefault ? ' <span class="dim">default</span>' : ""}</td>` +
               `<td class="num">${n(p.nodes)}</td>` +
               present.map((g) => `<td class="num">${p.byGroup[g] || '<span class="dim">0</span>'}</td>`).join("") +
               `<td>${esc(p.timelimit ?? "-")}</td><td>${esc(p.avail ?? "-")}</td></tr>`,
@@ -323,7 +355,7 @@ function nodesCard(parts) {
       : `<div class="rows">${parts
           .map(
             (p) =>
-              `<div class="row row-solo"><div class="row-label">${esc(p.name)}${
+              `<div class="row row-solo"><div class="row-label">${esc(partLabel(p))}${
                 p.isDefault ? '<span class="dflt">*</span>' : ""
               }</div>` +
               (p.nodes === 0
@@ -373,7 +405,7 @@ function capacityCard(parts) {
           </tr></thead><tbody>${withCpus
           .map(
             (p) =>
-              `<tr><td>${esc(p.name)}</td>` +
+              `<tr><td>${esc(partLabel(p))}</td>` +
               `<td class="num">${n(p.cpu.alloc)}</td><td class="num">${n(p.cpu.idle)}</td>` +
               `<td class="num">${p.cpu.other ? n(p.cpu.other) : '<span class="dim">0</span>'}</td>` +
               `<td class="num">${n(p.cpu.total)}</td>` +
@@ -395,7 +427,7 @@ function capacityCard(parts) {
                 color: CPU_COLOR[k],
                 textColor: CPU_TEXT[k],
                 tip:
-                  `${p.name} · ${CPU_LABEL[k]}: ${n(p.cpu[k])} of ${n(p.cpu.total)} CPUs (${(
+                  `${partLabel(p)} · ${CPU_LABEL[k]}: ${n(p.cpu[k])} of ${n(p.cpu.total)} CPUs (${(
                     (p.cpu[k] / p.cpu.total) *
                     100
                   ).toFixed(0)}%)` + (p.memoryMB ? `\n${n(Math.round(p.memoryMB / 1024))} GB per node` : ""),
@@ -407,12 +439,12 @@ function capacityCard(parts) {
                 value: gpuValues[k],
                 color: CPU_COLOR[k],
                 textColor: CPU_TEXT[k],
-                tip: `${p.name} · ${CPU_LABEL[k]}: ${n(gpuValues[k])} of ${n(p.gpuTotal)} ${
+                tip: `${partLabel(p)} · ${CPU_LABEL[k]}: ${n(gpuValues[k])} of ${n(p.gpuTotal)} ${
                   p.gpuModel ?? ""
                 } GPUs (${((gpuValues[k] / p.gpuTotal) * 100).toFixed(0)}%)`,
               }));
             return (
-              `<div class="row-label">${esc(p.name)}</div>` +
+              `<div class="row-label">${esc(partLabel(p))}</div>` +
               segments(cpuSegs, 100, "", true) +
               (p.gpuTotal
                 ? segments(gpuSegs, 100, "gpu-bar", true)
@@ -448,7 +480,7 @@ function capacityCard(parts) {
 }
 
 function problemCard(parts) {
-  const bad = parts.flatMap((p) => p.problemRows.map((r) => ({ ...r, partition: p.name })));
+  const bad = parts.flatMap((p) => p.problemRows.map((r) => ({ ...r, partition: partLabel(p) })));
   if (!bad.length) return "";
   const total = bad.reduce((t, r) => t + r.count, 0);
   return `<div class="card"><div class="card-head"><h2>Nodes needing attention</h2></div>
@@ -499,7 +531,7 @@ function queueCard(parts) {
           <th class="num">Next start</th><th class="num">Frees up</th><th class="num">Running</th><th>Top reason pending</th></tr></thead><tbody>${parts
           .map(
             (p) =>
-              `<tr><td>${esc(p.name)}</td><td class="num">${n(p.pending)}</td>` +
+              `<tr><td>${esc(partLabel(p))}</td><td class="num">${n(p.pending)}</td>` +
               `<td class="num">${n(p.pendingTasks)}</td>` +
               `<td class="num">${p.pendingCpus ? n(p.pendingCpus) : '<span class="dim">0</span>'}</td>` +
               `<td class="num">${p.pendingGpus ? n(p.pendingGpus) : '<span class="dim">0</span>'}</td>` +
@@ -514,7 +546,7 @@ function queueCard(parts) {
       : `<div class="rows">${parts
           .map((p) => {
             return (
-              `<div class="row row-solo"><div class="row-label">${esc(p.name)}${
+              `<div class="row row-solo"><div class="row-label">${esc(partLabel(p))}${
                 p.isDefault ? '<span class="dflt">*</span>' : ""
               }</div>` +
               segments(
@@ -524,7 +556,7 @@ function queueCard(parts) {
                     color: JOB_COLOR.running,
                     textColor: JOB_TEXT.running,
                     tip:
-                      `${p.name}: ${n(p.running)} running` +
+                      `${partLabel(p)}: ${n(p.running)} running` +
                       (p.runningCpus ? `\n${n(p.runningCpus)} CPUs, ${n(p.runningGpus)} GPUs in use` : "") +
                       (p.endsInSoonest !== null ? `\nnext one finishes in ${dur(p.endsInSoonest)}` : ""),
                   },
@@ -533,7 +565,7 @@ function queueCard(parts) {
                     color: JOB_COLOR.pending,
                     textColor: JOB_TEXT.pending,
                     tip:
-                      `${p.name}: ${n(p.pending)} pending (${n(p.pendingTasks)} array tasks)` +
+                      `${partLabel(p)}: ${n(p.pending)} pending (${n(p.pendingTasks)} array tasks)` +
                       (p.pendingCpus ? `\n${n(p.pendingCpus)} CPUs, ${n(p.pendingGpus)} GPUs requested` : "") +
                       (p.waitMedian !== null
                         ? `\nmedian wait ${dur(p.waitMedian)}, longest ${dur(p.waitMax)}`
@@ -675,7 +707,8 @@ function limitsCard(parts) {
 
   const held = rows.reduce((t, l) => t + l.jobs, 0);
   const pending = scopedJobs().filter((j) => j.state === "PD").length;
-  const idleCores = state.partition === "all" ? model.cluster.cpu.idle : (parts[0]?.cpu.idle ?? 0);
+  const idleCores =
+    state.partition === "all" ? model.cluster.cpu.idle : parts.reduce((t, p) => t + (p.cpu?.idle ?? 0), 0);
 
   // The fill escalates with severity against a lighter step of the same ramp,
   // and the number is printed either way, so colour never carries it alone.
@@ -865,7 +898,7 @@ function priorityCard(parts) {
       const all = state.expanded.has(key);
       const rows = all ? p.queue : p.queue.slice(0, TOP_N);
       const max = Math.max(1, ...p.queue.map((r) => r.priority));
-      return `<div class="pq"><div class="pq-head"><h3>${esc(p.name)}</h3>
+      return `<div class="pq"><div class="pq-head"><h3>${esc(partLabel(p))}</h3>
         <span class="dim">${n(p.queue.length)} pending job${p.queue.length === 1 ? "" : "s"} · top priority ${n(
           max,
         )}${p.waitMedian !== null ? ` · median wait ${dur(p.waitMedian)}` : ""}${
@@ -965,7 +998,12 @@ function kpiRow(parts) {
   const nodeSource =
     state.partition === "all"
       ? { nodes: model.cluster.nodes, byGroup: model.cluster.byGroup }
-      : (parts[0] ?? { nodes: 0, byGroup: {} });
+      : {
+          nodes: parts.reduce((t, p) => t + p.nodes, 0),
+          byGroup: Object.fromEntries(
+            STATE_GROUPS.map((g) => [g, parts.reduce((t, p) => t + (p.byGroup[g] ?? 0), 0)]),
+          ),
+        };
   const g = (k) => nodeSource.byGroup[k] ?? 0;
   const pending = jobs.filter((j) => j.state === "PD");
   const tasks = pending.reduce((t, j) => t + j.tasks, 0);
@@ -976,10 +1014,16 @@ function kpiRow(parts) {
      <div class="tile-value">${value}</div><div class="tile-sub">${sub}</div></div>`;
 
   const running = jobs.filter((j) => j.state === "R");
-  // Capacity is cluster-wide unless one partition is selected.
-  const cpu = state.partition === "all" ? model.cluster.cpu : (parts[0]?.cpu ?? { total: 0, idle: 0 });
+  // Capacity is cluster-wide unless the filter scopes to one or more partitions.
+  const cpu =
+    state.partition === "all"
+      ? model.cluster.cpu
+      : parts.reduce(
+          (t, p) => ({ total: t.total + (p.cpu?.total ?? 0), idle: t.idle + (p.cpu?.idle ?? 0) }),
+          { total: 0, idle: 0 },
+        );
   const gpuTotal =
-    state.partition === "all" ? model.cluster.gpuTotal : (parts[0]?.gpuTotal ?? 0);
+    state.partition === "all" ? model.cluster.gpuTotal : parts.reduce((t, p) => t + (p.gpuTotal ?? 0), 0);
   const gpuUsed = running.reduce((t, j) => t + j.gpus, 0);
   const gpuPct = gpuTotal ? Math.round((gpuUsed / gpuTotal) * 100) : 0;
   const waits = pending.map((j) => j.submit && Math.max(0, (+model.now - +j.submit) / 1000)).filter((w) => w);
@@ -1088,10 +1132,9 @@ function billingShapeNote() {
 function historyCard() {
   if (!model.notes.hasHistory) return "";
   const u = state.user.trim().toLowerCase();
+  const names = scopedPartitionNames();
   const scoped = model.history.filter(
-    (h) =>
-      (state.partition === "all" || h.partition === state.partition) &&
-      (!u || matchUser(h.user, u)),
+    (h) => (names === null || names.has(h.partition)) && (!u || matchUser(h.user, u)),
   );
   if (!scoped.length) return "";
   const st = historyStats(scoped);
@@ -1135,7 +1178,9 @@ function historyCard() {
     ${
       waste.jobs
         ? `<p class="axis-note"><b>Why memory costs cores.</b> ${esc(
-            state.partition === "all" ? "Every partition here" : state.partition,
+            state.partition === "all"
+              ? "Every partition here"
+              : (GROUP_FILTERS[state.partition]?.scopeLabel ?? state.partition),
           )} sets <code>MaxMemPerCPU</code>, so a memory request is satisfied by taking more cores — and <code>MAX_TRES</code> bills the core count. Across these jobs that is <b>${n(
             Math.round(waste.billedMinutes / 60),
           )}</b> core-hours charged where <b>${n(
@@ -1478,6 +1523,12 @@ function render() {
 
 const planForm = document.getElementById("plan-form");
 
+// ehunte18 is the tool's most common user — seed the account select with them
+// on first load only, so a later refresh never overwrites someone's own choice
+// (including an explicit switch back to "(default)", which is also "").
+const DEFAULT_ACCOUNT = "ehunte18";
+let accountSeeded = false;
+
 // The form is static markup, so the tick boxes can be found once.
 const optBoxes = new Map(
   [...planForm.querySelectorAll(".opt")].map((box) => [box.dataset.opt, box]),
@@ -1626,19 +1677,21 @@ function renderPlanForm() {
       p.name,
       // Kept short: a select truncates rather than wraps, and the detail is on
       // the cards beside it anyway.
-      `${p.name}${p.isDefault ? " *" : ""} — ${n(p.nodes)}n` +
+      `${partLabel(p)}${p.isDefault ? " *" : ""} — ${n(p.nodes)}n` +
         (p.perNode.gpus ? ` · ${p.perNode.gpus}×${p.gpuModel ?? "gpu"}` : ""),
     ]),
     parts.find((p) => p.isDefault)?.name,
   );
+  const accountNames = [...model.accounts].sort((a, b) => a.account.localeCompare(b.account)).map((a) => a.account);
   fillSelect(
     planForm.elements.account,
-    [
-      ["", "(default)"],
-      ...[...model.accounts].sort((a, b) => a.account.localeCompare(b.account)).map((a) => [a.account, a.account]),
-    ],
+    [["", "(default)"], ...accountNames.map((a) => [a, a])],
     "",
   );
+  if (!accountSeeded) {
+    accountSeeded = true;
+    if (accountNames.includes(DEFAULT_ACCOUNT)) planForm.elements.account.value = DEFAULT_ACCOUNT;
+  }
   fillGpuModels();
   fillQos();
   syncOptions();
@@ -1656,44 +1709,60 @@ const LEVEL_COLOR = {
 };
 const LEVEL_WORD = { ok: "ok", info: "adjusted", note: "note", warn: "will wait", bad: "blocked" };
 
-function preambleCard(f, req, part) {
+/**
+ * The submit script drawer at the foot of the planner: the `#SBATCH` preamble
+ * plus a meta line, refreshed on every edit. Feasibility's own checks already
+ * name the directives a partition rule silently adjusts; this only has to say
+ * what SLURM assumed for the rest.
+ */
+function renderDrawer(f) {
   const lines = ["#!/bin/bash", ...sbatchPreamble(f)];
-  const script = lines.join("\n");
-  const defaults = preambleDefaults(model, part, req);
-  // A directive is off exactly when the first input it governs read as null.
-  const unset = PREAMBLE_OPTIONS.filter((o) => f[o.inputs[0]] === null);
-  const asked = req.requested?.cpus ?? req.cpus;
-  const raised = req.cpus !== asked;
+  document.getElementById("plan-script").textContent = lines.join("\n");
+  const dirCount = lines.length - 1;
+  const name = f.jobName || "job";
+  document.getElementById("plan-drawer-meta").textContent =
+    `${name}.sh · ${n(dirCount)} directive${dirCount === 1 ? "" : "s"} · updates as you type`;
+}
 
-  return `<div class="card"><div class="card-head"><h2>SBATCH preamble</h2>
-      <button id="plan-copy" data-copy>Copy</button></div>
-    <p class="card-sub">Paste this at the top of your submit script, above the commands you want to run.</p>
-    <pre class="preamble" id="plan-script">${esc(script)}</pre>
-    <p class="axis-note">This job asks for <b>${n(asked)}</b> CPU${asked === 1 ? "" : "s"}${
-      req.gpus ? ` and <b>${n(req.gpus)}</b> GPU${req.gpus === 1 ? "" : "s"}` : ""
-    } across ${n(req.nodes)} node${req.nodes === 1 ? "" : "s"} for ${
-      f.days === null ? dur(req.minutes * 60) : esc(timeSpec(f))
-    }${req.tasks > 1 ? `, once per array task (${n(req.tasks)} of them)` : ""}.${
-      raised
-        ? ` <b>${part?.name ?? "The partition"}'s own rules raise that to ${n(req.cpus)} CPU${
-            req.cpus === 1 ? "" : "s"
-          }</b> — see “Will it run?” — and the cost and priority below use the larger figure, because that is what SLURM charges and ranks on.`
-        : ` <code>--cpus-per-task</code> × <code>--ntasks-per-node</code> × <code>--nodes</code> is what SLURM counts, and it is what the estimates below use.`
-    }</p>
-    ${
-      unset.length
-        ? `<p class="axis-note">${n(unset.length)} directive${
-            unset.length === 1 ? " is" : "s are"
-          } left out, so SLURM fills ${unset.length === 1 ? "it" : "them"} in. That is what the estimates below assume:</p>
-        <ul class="unset-list">${unset
-          .map(
-            (o) =>
-              `<li><code>--${esc(o.flag)}</code><span>${esc(defaults[o.key]?.text ?? "SLURM's own default applies.")}</span></li>`,
-          )
-          .join("")}</ul>
-        <p class="axis-note">Tick any of them on the left to write it down instead; each starts at the value shown here, so nothing about the job changes until you edit it.</p>`
-        : ""
-    }</div>`;
+// The header line above the directive table: where the job would land and
+// where its priority weights came from.
+function planMetaLine(part, req) {
+  const pending = part?.queue?.length ?? 0;
+  const acct = req.account || "association default";
+  const src = prioModel.source === "config" ? "weights from scontrol show config" : "weights fitted from the dumps";
+  return `${part?.name ?? "no partition"} · ${esc(acct)} · ${n(pending)} pending · ${src}`;
+}
+
+/**
+ * Where a freshly submitted job would land against the partition's live
+ * queue: everyone else's priority, sampled down to a bar chart, with this
+ * job's own estimate picked out.
+ */
+function queueBars(part, start) {
+  const values = (part?.queue ?? []).map((r) => r.priority).filter((v) => v > 0);
+  if (values.length < 2) return "";
+  const withYou = [...values, start].sort((a, b) => a - b);
+  const cap = 30;
+  const step = Math.max(1, Math.ceil(withYou.length / cap));
+  const sampled = [];
+  for (let i = 0; i < withYou.length; i += step) sampled.push(withYou[i]);
+  if (sampled.at(-1) !== withYou.at(-1)) sampled.push(withYou.at(-1));
+  const max = Math.max(1, ...withYou);
+  // The sample can bucket several priorities together, so "you" marks
+  // whichever bar ended up closest rather than an exact value.
+  let closest = 0;
+  for (let i = 1; i < sampled.length; i++) {
+    if (Math.abs(sampled[i] - start) < Math.abs(sampled[closest] - start)) closest = i;
+  }
+  const bars = sampled
+    .map(
+      (v, i) =>
+        `<span class="${i === closest ? "you" : ""}" style="height:${Math.max(3, (v / max) * 100)}%" data-tip="${esc(
+          i === closest ? `this job: ${n(start)}` : `${n(v)}`,
+        )}"></span>`,
+    )
+    .join("");
+  return `<div class="qbars">${bars}</div><div class="qbars-axis"><span>oldest</span><span>you</span><span>newest</span></div>`;
 }
 
 function feasibilityCard(req, part) {
@@ -1751,7 +1820,7 @@ function costCard(req, part) {
   const over = `${dur(req.minutes * 60)}${req.tasks > 1 ? ` × ${n(req.tasks)} tasks` : ""}`;
   const plural = (v, word) => `${n(v)} ${word}${v === 1 ? "" : "s"}`;
 
-  return `<div class="card"><div class="card-head"><h2>What it costs</h2></div>
+  return `<div class="card"><div class="card-head"><h2>Cost of the whole run</h2></div>
     <p class="card-sub">What the job commits if it runs to its full walltime — each figure is the whole run, not the rate while it runs. These are the same TRES-minutes that <code>GrpTRESMins</code> caps and <code>sshare</code> reports as in flight.</p>
     <div class="kpis plan-kpis">
       ${
@@ -1955,7 +2024,7 @@ function priorityCardPlan(req, part) {
     ]),
   ].filter(([f, v]) => v !== 0 || f === "jobsize" || f === "age");
 
-  return `<div class="card"><div class="card-head"><h2>Starting priority</h2></div>
+  return `<div class="card"><div class="card-head"><h2>Priority at submit</h2></div>
     <p class="card-sub">What this job would score the moment you submit it, and where that puts it in ${esc(
       part?.name ?? "the partition",
     )}'s queue as it stands.</p>
@@ -1985,6 +2054,7 @@ function priorityCardPlan(req, part) {
       <tr><td><b>Total</b></td><td class="num"><b>${n(start)}</b></td>
         <td class="dim">SLURM floors the sum of the factors, not each one</td></tr>
     </tbody></table></div>
+    ${queueBars(part, start)}
     <p class="axis-note">Priority over time: ${growth
       .map(([label, s]) => `${esc(label)} <b>${n(at(s))}</b>`)
       .join(" · ")}.</p>
@@ -2065,8 +2135,10 @@ function modelNote() {
 
 function renderPlan() {
   const out = document.getElementById("plan-out");
+  const meta = document.getElementById("plan-meta");
   if (!model || !prioModel) {
     out.innerHTML = `<div class="card"><p class="card-sub">Loading cluster data…</p></div>`;
+    meta.textContent = "loading…";
     return;
   }
   const f = readPlanForm();
@@ -2075,8 +2147,9 @@ function renderPlan() {
   // on what was typed — the partition can force the core count up, and fills in
   // the memory and the walltime for a request that names neither.
   const req = effectiveRequest(toRequest(f), part);
-  out.innerHTML =
-    preambleCard(f, req, part) + feasibilityCard(req, part) + costCard(req, part) + priorityCardPlan(req, part);
+  out.innerHTML = costCard(req, part) + priorityCardPlan(req, part) + feasibilityCard(req, part);
+  renderDrawer(f);
+  meta.textContent = planMetaLine(part, req);
 }
 
 function switchTab(tab) {
@@ -2185,6 +2258,33 @@ document.getElementById("view-plan").addEventListener("click", async (e) => {
     btn.textContent = "Copy failed — select it by hand";
   }
   setTimeout(() => (btn.textContent = "Copy"), 1600);
+});
+
+function toggleDrawer() {
+  const pre = document.getElementById("plan-script");
+  pre.hidden = !pre.hidden;
+  document.getElementById("plan-drawer-tri").textContent = pre.hidden ? "▸" : "▾";
+}
+const drawerToggle = document.getElementById("plan-drawer-toggle");
+drawerToggle.addEventListener("click", (e) => {
+  if (e.target.closest("button")) return;
+  toggleDrawer();
+});
+drawerToggle.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  e.preventDefault();
+  toggleDrawer();
+});
+
+document.getElementById("plan-download").addEventListener("click", () => {
+  const text = document.getElementById("plan-script").textContent;
+  const name = (readPlanForm().jobName || "job").replace(/[^\w.-]+/g, "_");
+  const url = URL.createObjectURL(new Blob([`${text}\n`], { type: "text/x-shellscript" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${name}.sh`;
+  a.click();
+  URL.revokeObjectURL(url);
 });
 
 document.getElementById("f-part").addEventListener("change", (e) => {

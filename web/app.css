@@ -4,108 +4,125 @@
 :root {
   color-scheme: light;
 
-  --page: #f9f9f7;
-  --surface-1: #fcfcfb;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --muted: #898781;
-  --grid: #e1e0d9;
-  --baseline: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.1);
-  --wash: rgba(11, 11, 11, 0.04);
+  --page: #f1f3f7;
+  --surface-1: #ffffff;
+  --surface-2: #e4e8f0;
+  --text-primary: #0f1b33;
+  --text-secondary: rgba(15, 27, 51, 0.62);
+  --muted: rgba(15, 27, 51, 0.5);
+  --grid: rgba(15, 27, 51, 0.16);
+  --baseline: rgba(15, 27, 51, 0.35);
+  --border: rgba(15, 27, 51, 0.32);
+  --border-strong: #0f1b33;
+  --wash: rgba(15, 27, 51, 0.05);
+  /* JHU Heritage Blue */
+  --accent: #002d72;
+  --accent-hover: #001a45;
+  --on-accent: #f1f3f7;
 
-  /* Node utilisation: one hue, light -> dark (ordinal ramp, blue 250/400/600) */
-  --node-idle: #86b6ef;
-  --node-mix: #3987e5;
-  --node-alloc: #184f95;
+  /* Node utilisation: one hue, light -> dark (Spirit Blue -> Seablue -> Heritage Blue) */
+  --node-idle: #68ace5;
+  --node-mix: #0072ce;
+  --node-alloc: #002d72;
   /* Neutral administrative states */
-  --node-resv: #898781;
-  --node-other: #52514e;
+  --node-resv: #8a8f9c;
+  --node-other: #4d5566;
   /* Reserved status tokens: never used for a series */
-  --status-warning: #fab219;
-  --status-critical: #d03b3b;
-  --status-good: #0ca30c;
+  --status-warning: #f1c400;
+  --status-critical: #cf4520;
+  --status-good: #009b77;
 
   /* Legible label colour for text set directly on each of the above fills */
-  --on-idle: #0b2545;
+  --on-idle: #071b36;
   --on-mix: #ffffff;
   --on-alloc: #ffffff;
-  --on-resv: #1a1a19;
+  --on-resv: #14161b;
   --on-other: #ffffff;
-  --on-warning: #3d2600;
+  --on-warning: #3a2c00;
   --on-critical: #ffffff;
 
-  /* Categorical slots, fixed order */
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
-  --series-6: #008300;
-  --series-7: #4a3aa7;
-  --series-8: #e34948;
+  /* Categorical slots, fixed order — the eight official JHU brand colours */
+  --series-1: #0072ce;
+  --series-2: #cf4520;
+  --series-3: #009b77;
+  --series-4: #f1c400;
+  --series-5: #a15a95;
+  --series-6: #76232f;
+  --series-7: #002d72;
+  --series-8: #68ace5;
   --on-series-1: #ffffff;
-  --on-series-2: #3d2600;
+  --on-series-2: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     color-scheme: dark;
-    --page: #0d0d0d;
-    --surface-1: #1a1a19;
-    --text-primary: #ffffff;
-    --text-secondary: #c3c2b7;
-    --muted: #898781;
-    --grid: #2c2c2a;
-    --baseline: #383835;
-    --border: rgba(255, 255, 255, 0.1);
-    --wash: rgba(255, 255, 255, 0.06);
+    --page: #0d121c;
+    --surface-1: #161c2b;
+    --surface-2: #1e2638;
+    --text-primary: #f1f3f7;
+    --text-secondary: rgba(241, 243, 247, 0.65);
+    --muted: rgba(241, 243, 247, 0.5);
+    --grid: rgba(241, 243, 247, 0.16);
+    --baseline: rgba(241, 243, 247, 0.32);
+    --border: rgba(241, 243, 247, 0.28);
+    --border-strong: #f1f3f7;
+    --wash: rgba(241, 243, 247, 0.06);
+    /* JHU Spirit Blue */
+    --accent: #68ace5;
+    --accent-hover: #8fc4ee;
+    --on-accent: #051633;
 
-    --node-idle: #9ec5f4;
-    --node-mix: #2a78d6;
+    --node-idle: #9cc9f2;
+    --node-mix: #1f74c4;
     --node-alloc: #184f95;
-    --node-resv: #898781;
-    --node-other: #c3c2b7;
-    --on-other: #1a1a19;
+    --node-resv: #8a8f9c;
+    --node-other: #c7ccd6;
+    --on-other: #0d121c;
 
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #008300;
-    --series-7: #9085e9;
-    --series-8: #e66767;
+    --series-1: #2a6fbd;
+    --series-2: #cf4520;
+    --series-3: #17b98c;
+    --series-4: #f1c400;
+    --series-5: #c07ab3;
+    --series-6: #c25863;
+    --series-7: #4577c9;
+    --series-8: #7db8ea;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #0d0d0d;
-  --surface-1: #1a1a19;
-  --text-primary: #ffffff;
-  --text-secondary: #c3c2b7;
-  --muted: #898781;
-  --grid: #2c2c2a;
-  --baseline: #383835;
-  --border: rgba(255, 255, 255, 0.1);
-  --wash: rgba(255, 255, 255, 0.06);
+  --page: #0d121c;
+  --surface-1: #161c2b;
+  --surface-2: #1e2638;
+  --text-primary: #f1f3f7;
+  --text-secondary: rgba(241, 243, 247, 0.65);
+  --muted: rgba(241, 243, 247, 0.5);
+  --grid: rgba(241, 243, 247, 0.16);
+  --baseline: rgba(241, 243, 247, 0.32);
+  --border: rgba(241, 243, 247, 0.28);
+  --border-strong: #f1f3f7;
+  --wash: rgba(241, 243, 247, 0.06);
+  --accent: #68ace5;
+  --accent-hover: #8fc4ee;
+  --on-accent: #051633;
 
-  --node-idle: #9ec5f4;
-  --node-mix: #2a78d6;
+  --node-idle: #9cc9f2;
+  --node-mix: #1f74c4;
   --node-alloc: #184f95;
-  --node-resv: #898781;
-  --node-other: #c3c2b7;
-  --on-other: #1a1a19;
+  --node-resv: #8a8f9c;
+  --node-other: #c7ccd6;
+  --on-other: #0d121c;
 
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --series-4: #c98500;
-  --series-5: #d55181;
-  --series-6: #008300;
-  --series-7: #9085e9;
-  --series-8: #e66767;
+  --series-1: #2a6fbd;
+  --series-2: #cf4520;
+  --series-3: #17b98c;
+  --series-4: #f1c400;
+  --series-5: #c07ab3;
+  --series-6: #c25863;
+  --series-7: #4577c9;
+  --series-8: #7db8ea;
 }
 
 * {
@@ -116,8 +133,21 @@ body {
   margin: 0;
   background: var(--page);
   color: var(--text-primary);
-  font: 400 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 400 14px/1.5 Archivo, system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+code,
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+a {
+  color: var(--accent);
+}
+
+a:hover {
+  color: var(--accent-hover);
 }
 
 .wrap {
@@ -137,10 +167,10 @@ body {
 }
 
 h1 {
-  font-size: 20px;
-  font-weight: 600;
+  font: 800 15px/1 Archivo, sans-serif;
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .topbar-right {
@@ -156,9 +186,8 @@ h1 {
 }
 
 .stale {
-  color: var(--text-primary);
-  background: var(--wash);
-  border-radius: 999px;
+  color: var(--on-accent);
+  background: var(--accent);
   padding: 2px 9px;
   font-size: 12px;
   white-space: nowrap;
@@ -176,13 +205,14 @@ input[type="search"] {
   color: var(--text-primary);
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 0;
   padding: 5px 10px;
   min-height: 30px;
 }
 
 button {
   cursor: pointer;
+  font-weight: 600;
 }
 
 button:hover,
@@ -196,18 +226,21 @@ select:hover {
   display: flex;
   gap: 2px;
   margin: 18px 0 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--border-strong);
 }
 
 .tabs button {
   border: 0;
   border-bottom: 2px solid transparent;
-  border-radius: 6px 6px 0 0;
+  border-radius: 0;
   background: transparent;
   color: var(--text-secondary);
   padding: 8px 14px;
   min-height: 34px;
-  font-size: 13px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: -2px;
 }
 
 .tabs button:hover {
@@ -216,175 +249,273 @@ select:hover {
 
 .tabs button[aria-selected="true"] {
   color: var(--text-primary);
-  font-weight: 600;
-  border-bottom-color: var(--series-1);
+  border-bottom-color: var(--accent);
 }
 
 /* ---------- job planner ---------- */
 
-.plan-grid {
-  display: grid;
-  grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
+.plan-card {
+  background: var(--surface-2);
+  border: 2px solid var(--border-strong);
   margin-top: 20px;
 }
 
-/* The form stays put while the estimates beside it are read. It scrolls within
-   itself when expanded past the viewport, which a plain sticky block would
-   otherwise leave with its lower fields unreachable. */
-.plan-form {
-  position: sticky;
-  top: 16px;
-  margin-bottom: 0;
-  max-height: calc(100vh - 32px);
-  overflow-y: auto;
-}
-
-/* Three columns: the tick that decides whether the directive is written at all,
-   its name, and its value. */
-.plan-form fieldset {
-  border: 0;
-  border-top: 1px solid var(--grid);
-  margin: 0 0 14px;
-  padding: 12px 0 0;
-  display: grid;
-  grid-template-columns: 16px 84px minmax(0, 1fr);
+.plan-head {
+  display: flex;
   align-items: center;
-  gap: 8px 8px;
+  gap: 16px;
+  padding: 11px 18px;
+  border-bottom: 2px solid var(--border-strong);
+  background: var(--page);
 }
 
-.plan-form input.opt {
-  width: 16px;
-  height: 16px;
+.plan-title {
+  font: 800 12px/1 Archivo, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex: none;
+}
+
+.plan-meta {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+#plan-reset {
+  margin-left: auto;
+  flex: none;
+}
+
+.plan-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+/* ---- the directive table ---- */
+
+.plan-table {
+  border-right: 2px solid var(--border-strong);
+  min-width: 0;
+}
+
+.prow {
+  display: grid;
+  grid-template-columns: 26px 180px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--grid);
+}
+
+.phead {
+  font: 600 9.5px/1 Archivo, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 2px solid var(--border-strong);
+  padding: 9px 16px;
+}
+
+.pcat {
+  padding: 9px 16px 4px;
+  font: 800 9px/1 Archivo, sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-top: 1px solid var(--grid);
+}
+
+.plan-table > .pcat:first-of-type {
+  border-top: 0;
+}
+
+.prow input.opt {
+  width: 14px;
+  height: 14px;
   margin: 0;
   cursor: pointer;
-  accent-color: var(--series-1);
+  accent-color: var(--accent);
 }
 
-/* An unwritten directive is still readable — the value shown is what SLURM
-   would use — but it should not look like part of the preamble. */
-.plan-form :disabled {
-  opacity: 0.45;
-}
-
-.plan-form label.off {
-  color: var(--muted);
-}
-
-.plan-form legend {
-  color: var(--muted);
+.pflag {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
-  padding: 0 6px 0 0;
+  color: var(--text-primary);
 }
 
-.plan-form label {
-  color: var(--text-secondary);
-  font-size: 13px;
+.prow label.off,
+.prow:has(input.opt:not(:checked)) .pflag {
+  color: var(--muted);
 }
 
-.plan-form input,
-.plan-form select {
+.pval {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pval input,
+.pval select {
+  font: 400 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  min-height: 26px;
+  padding: 3px 7px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
   width: 100%;
   min-width: 0;
 }
 
-.plan-form input[type="number"] {
-  font-variant-numeric: tabular-nums;
+.pval select {
+  font-family: Archivo, sans-serif;
+}
+
+/* An unwritten directive is still readable — the value shown is what SLURM
+   would use — but it should not look like part of the preamble. */
+.pval :disabled {
+  opacity: 0.5;
 }
 
 /* value + unit + scope on one line, e.g. 64 / G / per node — wrapping rather
    than truncating a select, which would hide the choice that is in effect */
-.plan-form .pair {
-  display: flex;
+.pval.pair {
   flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
 }
 
-.plan-form .pair input[type="number"] {
-  width: 3.8em;
+.pval.pair input[type="number"] {
+  width: 3.6em;
   flex: none;
-  padding-right: 4px;
 }
 
-.plan-form .pair select {
-  flex: 1 1 5.5em;
+.pval.pair select {
+  flex: 1 1 6em;
   width: auto;
 }
 
 /* The unit select holds one character, so it should not take an equal share. */
-.plan-form .pair select.short {
-  flex: 0 1 3.6em;
+.pval.pair select.short {
+  flex: 0 1 3.4em;
 }
 
-.plan-form .unit {
+.unit {
   color: var(--muted);
   font-size: 12px;
 }
 
-.plan-form .checks {
-  display: flex;
-  gap: 12px;
-  font-size: 13px;
+.pval.checks {
+  gap: 14px;
+  font-size: 12.5px;
   color: var(--text-secondary);
 }
 
-.plan-form .checks label {
+.pval.checks label {
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
 
-.plan-form .checks input {
+.pval.checks input {
   width: auto;
 }
 
-.plan-form details {
+#plan-more {
   border-top: 1px solid var(--grid);
-  padding-top: 10px;
 }
 
-.plan-form summary {
+#plan-more summary {
   cursor: pointer;
+  list-style: none;
+  padding: 9px 16px;
+  font-size: 11.5px;
   color: var(--text-secondary);
-  font-size: 13px;
 }
 
-.plan-form details fieldset {
-  border-top: 0;
-  padding-top: 12px;
+#plan-more summary::-webkit-details-marker {
+  display: none;
 }
 
-/* Denser than the dashboard's KPI row: these tiles sit inside a card. The
-   label keeps its two-line reserve so the values stay on a common baseline
-   whether or not a label wraps. */
-.plan-kpis {
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  margin-bottom: 16px;
+#plan-more summary::before {
+  content: "▸ ";
+  font-family: ui-monospace, monospace;
+}
+
+#plan-more[open] summary::before {
+  content: "▾ ";
+}
+
+#plan-more .prow:last-of-type {
+  border-bottom: 0;
+}
+
+/* ---- sidebar: cost, priority, will-it-run ---- */
+
+.plan-side {
+  padding: 14px 16px 16px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.plan-side .card {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0 0 13px;
+}
+
+.plan-side .card + .card {
+  border-top: 2px solid var(--border-strong);
+  padding-top: 13px;
+}
+
+.plan-side h2 {
+  font: 800 9.5px/1 Archivo, sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.plan-side .card-sub {
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+
+.plan-side table {
+  font-size: 11.5px;
+}
+
+.plan-side th,
+.plan-side td {
+  padding: 4px 6px 4px 0;
+}
+
+.plan-side .axis-note {
+  font-size: 10.5px;
+}
+
+/* Denser than the dashboard's KPI row: these tiles sit inside the sidebar.
+   Doubled class beats the plain .kpis rule declared later in the file. */
+.kpis.plan-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.plan-kpis .tile {
+  border: 0;
+  background: none;
+  padding: 0;
 }
 
 .plan-kpis .tile-value {
   font-size: 22px;
 }
 
-.preamble {
-  margin: 0;
-  padding: 12px 14px;
-  background: var(--page);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow-x: auto;
-  font: 400 12.5px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color: var(--text-primary);
-}
-
 .checks-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -394,7 +525,7 @@ select:hover {
   padding: 6px 0;
   border-bottom: 1px solid var(--grid);
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
+  grid-template-columns: 70px minmax(0, 1fr);
   gap: 8px;
   align-items: baseline;
 }
@@ -405,38 +536,109 @@ select:hover {
 }
 
 .checks-list .chip {
-  font-size: 12px;
+  font-size: 11px;
 }
 
-/* The directives the preamble leaves out, against what SLURM puts there
-   instead. Same two-column shape as the checks list, since it is read the same
-   way: a name on the left, a consequence on the right. */
-.unset-list {
-  list-style: none;
-  margin: 0 0 10px;
-  padding: 0;
-  font-size: 13px;
-  color: var(--text-secondary);
+/* Priority queue position: oldest, this job, newest. */
+.qbars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 40px;
+  margin-top: 10px;
 }
 
-.unset-list li {
-  padding: 5px 0;
-  border-bottom: 1px solid var(--grid);
-  display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
-  gap: 10px;
-  align-items: baseline;
+.qbars span {
+  flex: 1;
+  display: block;
+  background: var(--grid);
+}
+
+.qbars span.you {
+  background: var(--accent);
+}
+
+.qbars-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ---- submit script drawer ---- */
+
+.plan-drawer {
+  border-top: 2px solid var(--border-strong);
+  background: var(--border-strong);
+  color: var(--page);
+}
+
+.plan-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+
+.plan-drawer-head .tri {
+  font-family: ui-monospace, monospace;
+}
+
+/* Overrides the page-tuned .dim color, which reads as dark-on-dark here. */
+.plan-drawer-head .dim {
+  color: inherit;
+  opacity: 0.6;
+}
+
+.drawer-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* The drawer's own background/text are inverted relative to the page (see
+   .plan-drawer above), so its chrome is mixed from --page rather than a
+   fixed light value — the mix flips along with the drawer in dark theme. */
+.plan-drawer button {
+  border: 1px solid color-mix(in srgb, var(--page) 40%, transparent);
+  background: transparent;
+  color: inherit;
+  font-size: 11.5px;
+  padding: 5px 11px;
+  min-height: 0;
+}
+
+.plan-drawer button:hover {
+  background: color-mix(in srgb, var(--page) 12%, transparent);
+}
+
+.plan-drawer button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.plan-script {
+  margin: 0;
+  padding: 0 18px 18px;
+  font: 400 12px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
+  overflow-x: auto;
 }
 
 @media (max-width: 860px) {
-  .plan-grid {
+  .plan-body {
     grid-template-columns: minmax(0, 1fr);
   }
-  .plan-form {
-    position: static;
-    margin-bottom: 20px;
-    max-height: none;
-    overflow-y: visible;
+  .plan-table {
+    border-right: 0;
+    border-bottom: 2px solid var(--border-strong);
+  }
+  .plan-head {
+    flex-wrap: wrap;
   }
 }
 
@@ -451,7 +653,6 @@ select:hover {
   padding: 12px 14px;
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 10px;
 }
 
 /* The [hidden] attribute UA rule ties in specificity with .filters above and
@@ -487,7 +688,6 @@ select:hover {
 .tile {
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 10px;
   padding: 14px 16px;
 }
 
@@ -499,8 +699,7 @@ select:hover {
 }
 
 .tile-value {
-  font-size: 26px;
-  font-weight: 600;
+  font: 800 26px/1 Archivo, sans-serif;
   letter-spacing: -0.02em;
   margin-top: 2px;
 }
@@ -522,7 +721,6 @@ select:hover {
 .card {
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 10px;
   padding: 18px 20px 20px;
   margin-bottom: 20px;
 }
@@ -536,8 +734,8 @@ select:hover {
 }
 
 h2 {
-  font-size: 15px;
-  font-weight: 600;
+  font: 800 13px/1 Archivo, sans-serif;
+  letter-spacing: 0.03em;
   margin: 0;
 }
 
@@ -551,7 +749,6 @@ h2 {
   margin-left: auto;
   display: flex;
   border: 1px solid var(--border);
-  border-radius: 6px;
   overflow: hidden;
 }
 
@@ -566,8 +763,8 @@ h2 {
 }
 
 .toggle button[aria-pressed="true"] {
-  background: var(--wash);
-  color: var(--text-primary);
+  background: var(--accent);
+  color: var(--on-accent);
   font-weight: 600;
 }
 
@@ -591,7 +788,6 @@ h2 {
 .swatch {
   width: 10px;
   height: 10px;
-  border-radius: 2px;
   flex: none;
 }
 
@@ -863,7 +1059,6 @@ td.clip {
   border-left: 3px solid var(--status-critical);
   padding: 10px 14px;
   background: var(--wash);
-  border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
   font-size: 13px;
 }
@@ -882,9 +1077,8 @@ td.clip {
   transition: opacity 90ms;
   background: var(--surface-1);
   color: var(--text-primary);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
-  border-radius: 8px;
   padding: 8px 10px;
   font-size: 12.5px;
   max-width: 320px;
