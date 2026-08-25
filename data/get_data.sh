@@ -9,29 +9,75 @@ fi
 
 HOST=$1
 
-echo "Fetching Slurm data from $HOST..."
+echo "Fetching Slurm data from $HOST (single SSH session)..."
 
-run_step() {
-    local name=$1
-    local outfile=$2
-    shift 2
-    ssh "$HOST" "$@" > "$outfile"
+# Parallel arrays: step name, local output file, remote command.
+NAMES=(sprio sinfo squeue sshare sacct_qos sacct_assoc scontrol_config scontrol_partition scontrol_job sacct_hist scontrol_assoc_mgr sacctmgr_qos scontrol_node)
+OUTFILES=(sprio.txt sinfo.txt squeue.txt sshare.txt sacct_qos.txt sacct_assoc.txt scontrol_config.txt scontrol_partition.txt scontrol_job.txt sacct_hist.txt scontrol_assoc_mgr.txt sacctmgr_qos.txt scontrol_node.txt)
+CMDS=(
+    'sprio -o "%i|%r|%20u|%a|%Y|%S|%A|%B|%F|%J|%P|%N|%Q|%n|%T"'
+    'sinfo -o "%P|%a|%l|%D|%T|%N|%C|%G|%m|%E"'
+    'squeue -o "%i|%P|%u|%a|%j|%T|%M|%L|%D|%C|%b|%m|%Q|%V|%S|%R|%q"'
+    'sshare -l -P'
+    'sacctmgr -nP show qos   format=name,priority,grptres,maxtresperuser,maxtresperaccount,maxjobspu'
+    'sacctmgr -nP show assoc format=account,user,qos,grptres,maxtres,maxjobs'
+    'scontrol show config'
+    'scontrol -o show partition'
+    'scontrol show job'
+    'sacct -aP -S now-3days -o JobID,Partition,Account,User,State,Submit,Start,End,Elapsed,TimelimitRaw,ReqTRES,AllocTRES,MaxRSS,ExitCode'
+    'scontrol show assoc_mgr'
+    'sacctmgr -nP show qos format=name,priority,usagefactor,grptres,maxtresperuser,maxtresperaccount,maxtresperjob,maxwall,maxjobspu,maxsubmitjobspu,grpjobs,flags,preempt'
+    'scontrol show node'
+)
+
+MARK="__CLUSTER_ASSISTANT_STEP__"
+
+# Build one remote script that runs every command back to back, tagging
+# each block of output with a marker so it can be split apart locally.
+# This lets everything run over a single SSH connection (one 2FA prompt).
+REMOTE_SCRIPT=$(mktemp)
+for i in "${!NAMES[@]}"; do
+    {
+        echo "echo '${MARK}_BEGIN_${i}'"
+        echo "${CMDS[$i]}"
+        echo "echo '${MARK}_END_${i}'"
+    } >> "$REMOTE_SCRIPT"
+done
+
+COMBINED=$(mktemp)
+ssh "$HOST" 'bash -s' < "$REMOTE_SCRIPT" > "$COMBINED"
+SSH_STATUS=$?
+rm -f "$REMOTE_SCRIPT"
+
+if [ $SSH_STATUS -ne 0 ]; then
+    echo "ssh to $HOST failed (exit $SSH_STATUS)" >&2
+    rm -f "$COMBINED"
+    exit $SSH_STATUS
+fi
+
+# Split the combined output back into the individual per-command files.
+CURRENT=""
+while IFS= read -r line; do
+    case "$line" in
+        "${MARK}_BEGIN_"*)
+            idx="${line#${MARK}_BEGIN_}"
+            CURRENT="${OUTFILES[$idx]}"
+            : > "$CURRENT"
+            ;;
+        "${MARK}_END_"*)
+            CURRENT=""
+            ;;
+        *)
+            if [ -n "$CURRENT" ]; then
+                echo "$line" >> "$CURRENT"
+            fi
+            ;;
+    esac
+done < "$COMBINED"
+rm -f "$COMBINED"
+
+for name in "${NAMES[@]}"; do
     echo "✔ $name"
-}
-
-run_step "sprio"           sprio.txt           'sprio -o "%i|%r|%20u|%a|%Y|%S|%A|%B|%F|%J|%P|%N|%Q|%n|%T"'
-run_step "sinfo"           sinfo.txt           'sinfo -o "%P|%a|%l|%D|%T|%N|%C|%G|%m|%E"'
-run_step "squeue"          squeue.txt          'squeue -o "%i|%P|%u|%a|%j|%T|%M|%L|%D|%C|%b|%m|%Q|%V|%S|%R|%q"'
-run_step "sshare"          sshare.txt          'sshare -l -P'
-run_step "sacct_qos"       sacct_qos.txt       'sacctmgr -nP show qos   format=name,priority,grptres,maxtresperuser,maxtresperaccount,maxjobspu'
-run_step "sacct_assoc"     sacct_assoc.txt     'sacctmgr -nP show assoc format=account,user,qos,grptres,maxtres,maxjobs'
-run_step "scontrol_config" scontrol_config.txt 'scontrol show config'
-run_step "scontrol_partition" scontrol_partition.txt 'scontrol -o show partition'
-run_step "scontrol_job"    scontrol_job.txt    'scontrol show job'
-run_step "sacct_hist"      sacct_hist.txt      'sacct -aP -S now-3days -o JobID,Partition,Account,User,State,Submit,Start,End,Elapsed,TimelimitRaw,ReqTRES,AllocTRES,MaxRSS,ExitCode'
-run_step "scontrol_assoc_mgr" scontrol_assoc_mgr.txt 'scontrol show assoc_mgr'
-run_step "sacctmgr_qos"    sacctmgr_qos.txt    'sacctmgr -nP show qos format=name,priority,usagefactor,grptres,maxtresperuser,maxtresperaccount,maxtresperjob,maxwall,maxjobspu,maxsubmitjobspu,grpjobs,flags,preempt'
-run_step "scontrol_node"   scontrol_node.txt   'scontrol show node'
-
+done
 
 echo "Done! Data saved to local text files."
