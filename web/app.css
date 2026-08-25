@@ -496,12 +496,6 @@ select:hover {
   cursor: help;
 }
 
-/* Forces these three onto one row even in the narrow sidebar, instead of
-   wrapping per auto-fit's usual minmax. */
-.kpis.plan-kpis.cost-line {
-  grid-template-columns: repeat(3, 1fr);
-}
-
 .tech-notes {
   margin-top: 10px;
   border-top: 1px solid var(--grid);

@@ -1832,74 +1832,59 @@ function costCard(req, part) {
     "What the job commits if it runs to its full walltime — each figure is the whole run, not the rate while it runs. These are the same TRES-minutes that GrpTRESMins caps and sshare reports as in flight.";
 
   const topTiles = [
-    bill
-      ? tile(
-          "Billing-hours",
-          n(Math.round(billTotal / 60)),
-          `${plural(Math.round(bill.total), "unit")} held × ${over} = ${n(
-            Math.round(billTotal),
-          )} billing-minutes`,
-        )
-      : "",
+    bill ? tile("Billing-hours", n(Math.round(billTotal / 60)), "") : "",
     req.gpus ? tile("GPU-hours", n(Math.round(total.gpuHours)), `${plural(req.gpus, "GPU")} × ${over}`) : "",
   ]
     .filter(Boolean)
     .join("");
 
+  // Which of these three the bill is actually driven by, so the row that moves
+  // the bill is visually distinct from the ones that don't.
+  const driverTres = bill?.driver?.tres ?? null;
+  const costRows = [
+    { tres: "cpu", label: "CPU-hours", value: n(Math.round(total.cpuHours)), sub: `${plural(req.cpus, "core")} × ${over}` },
+    {
+      tres: "node",
+      label: "Node-hours",
+      value: n(Math.round(total.nodeHours * 10) / 10),
+      sub: `${plural(req.nodes, "node")} × ${over}`,
+    },
+    {
+      tres: "mem",
+      label: "GB-hours",
+      value: n(Math.round(total.memGBMinutes / 60)),
+      sub: `${n(Math.round(req.memMB / 1024))} GB × ${over}`,
+    },
+  ];
+
+  const acc = head?.account;
+  const cpuUsedH = acc ? (acc.runCpu + total.cpuMinutes) / 60 : null;
+  const gpuUsedH = acc ? (acc.runGpu + total.gpuMinutes) / 60 : null;
+  const cpuLimitH = acc?.cpuLimit ? acc.cpuLimit / 60 : null;
+  const gpuLimitH = acc?.gpuLimit ? acc.gpuLimit / 60 : null;
+  const usedOf = (used, limit) => `${n(Math.round(used))} / ${limit === null ? "uncapped" : n(Math.round(limit))}`;
+
   return `<div class="card"><div class="card-head"><h2>Cost of the whole run</h2><span class="tip-icon" data-tip="${esc(
     costTip,
   )}">?</span></div>
     ${topTiles ? `<div class="kpis plan-kpis">${topTiles}</div>` : ""}
-    <div class="kpis plan-kpis cost-line">
-      ${tile("CPU-hours", n(Math.round(total.cpuHours)), `${plural(req.cpus, "core")} × ${over}`)}
-      ${tile(
-        "Node-hours",
-        n(Math.round(total.nodeHours * 10) / 10),
-        `${plural(req.nodes, "node")} × ${over}`,
-      )}
-      ${tile(
-        "GB-hours",
-        n(Math.round(total.memGBMinutes / 60)),
-        `${n(Math.round(req.memMB / 1024))} GB × ${over}`,
-      )}
-    </div>
+    <div class="scroll"><table><thead><tr><th>Resource</th><th class="num">Over the run</th><th></th></tr></thead>
+      <tbody>
+        ${costRows
+          .map(
+            (r) =>
+              `<tr><td>${esc(r.label)}</td><td class="num">${
+                r.tres === driverTres ? `<b>${r.value}</b>` : r.value
+              }</td><td class="dim">${esc(r.sub)}</td></tr>`,
+          )
+          .join("")}
+      </tbody></table></div>
     ${
       head
-        ? `<div class="scroll"><table><thead><tr><th>Against ${esc(head.account.account)}</th>
-            <th class="num">Allowance</th><th class="num">Already committed</th><th class="num">This job</th>
-            <th class="num">Left after</th><th>Usage</th></tr></thead><tbody>
-          ${head.rows
-            .map((r) => {
-              const after = r.limit ? r.limit - r.used - r.want : null;
-              const pct = r.limit ? Math.min(100, ((r.used + r.want) / r.limit) * 100) : 0;
-              const fill = pct >= 100 ? "var(--status-critical)" : pct >= 90 ? "var(--status-warning)" : "var(--node-alloc)";
-              return (
-                `<tr><td>${esc(r.label)}</td>` +
-                `<td class="num">${r.limit ? n(r.limit) : '<span class="dim">none</span>'}</td>` +
-                `<td class="num">${n(Math.round(r.used))}</td>` +
-                `<td class="num"><b>${n(Math.round(r.want))}</b></td>` +
-                `<td class="num">${
-                  after === null
-                    ? '<span class="dim">-</span>'
-                    : after < 0
-                      ? `<span class="chip" style="--c:var(--status-critical)"><i class="dot"></i>${n(Math.round(after))} over</span>`
-                      : n(Math.round(after))
-                }</td>` +
-                `<td>${
-                  r.limit
-                    ? `<div class="bar" style="width:140px" data-tip="${esc(
-                        `${r.label}: ${n(Math.round(r.used))} committed + ${n(Math.round(r.want))} for this job = ${pct.toFixed(0)}% of ${n(r.limit)}`,
-                      )}"><span class="seg" style="flex:${Math.max(r.used, 0.001)};--c:${fill}"><i></i></span>` +
-                      `<span class="seg" style="flex:${Math.max(r.want, 0.001)};--c:var(--series-2)"><i></i></span>` +
-                      (r.used + r.want < r.limit
-                        ? `<span class="seg" style="flex:${r.limit - r.used - r.want};--c:var(--node-idle)"><i></i></span>`
-                        : "") +
-                      `</div>`
-                    : '<span class="dim">uncapped</span>'
-                }</td></tr>`
-              );
-            })
-            .join("")}
+        ? `<p class="axis-note">Account: <b>${esc(head.account.account)}</b></p>
+          <div class="scroll"><table><tbody>
+            <tr><td>CPU-hours (this job)</td><td class="num">${usedOf(cpuUsedH, cpuLimitH)}</td></tr>
+            <tr><td>GPU-hours (this job)</td><td class="num">${usedOf(gpuUsedH, gpuLimitH)}</td></tr>
           </tbody></table></div>`
         : `<p class="axis-note">No <code>sshare</code> row for <b>${esc(req.account || "this account")}</b>, so its remaining allowance is unknown.</p>`
     }
