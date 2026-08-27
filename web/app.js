@@ -1582,7 +1582,6 @@ function readPlanForm() {
     jobName: optStr("jobName", "jobName"),
     partition: optStr("partition", "partition"),
     account: optStr("account", "account"),
-    qos: optStr("qos", "qos"),
     nodes: optNum("nodes", "nodes", 1),
     ntasksPerNode: optNum("ntasksPerNode", "ntasksPerNode", 1),
     cpusPerTask: optNum("cpusPerTask", "cpusPerTask", 1),
@@ -1640,7 +1639,7 @@ function syncOption(opt, defaults, seed) {
   for (const [name, value] of Object.entries(d.values)) {
     const el = planForm.elements[name];
     // A select can only be seeded with an option it actually has — the GPU model
-    // list is rebuilt per partition, and an account may not hold every QOS.
+    // list is rebuilt per partition.
     if (!el) continue;
     if (el.tagName === "SELECT" && ![...el.options].some((o) => o.value === String(value))) continue;
     el.value = value;
@@ -1675,14 +1674,6 @@ function fillSelect(el, options, fallback) {
     .join("");
   const has = options.some(([v]) => v === want);
   el.value = has ? want : (fallback ?? options[0]?.[0] ?? "");
-}
-
-// QOS is an association property, so offer only what the chosen account may use.
-function fillQos() {
-  const account = planForm.elements.account.value;
-  const assoc = model.assocList?.find((a) => a.account === account && !a.user);
-  const names = assoc?.qos.length ? assoc.qos : model.qosList.map((q) => q.name);
-  fillSelect(planForm.elements.qos, [["", "(default)"], ...names.map((q) => [q, q])]);
 }
 
 // GPU models are a property of the partition's nodes — the partition the job
@@ -1726,7 +1717,6 @@ function renderPlanForm() {
     }
   }
   fillGpuModels();
-  fillQos();
   syncOptions();
   renderPlan();
 }
@@ -1845,7 +1835,7 @@ function costCard(req, part) {
   const shareCpu = part?.cpu.total ? (req.cpus / part.cpu.total) * 100 : null;
   const shareGpu = part?.gpuTotal ? (req.gpus / part.gpuTotal) * 100 : null;
 
-  const bill = jobBilling(req, part, model.config, model.qosList?.find((q) => q.name === (req.qos || part?.info?.qos)));
+  const bill = jobBilling(req, part, model.config, model.qosList?.find((q) => q.name === part?.info?.qos));
   const billTotal = bill ? bill.minutes * (req.tasks > 1 ? req.tasks : 1) : null;
 
   // Every tile is a total over the whole run, and the line under it is the rate
@@ -2379,9 +2369,8 @@ planForm.addEventListener("input", (e) => {
 planForm.addEventListener("change", (e) => {
   if (!model) return;
   const opt = e.target.classList.contains("opt") ? e.target.dataset.opt : null;
-  // Both of these narrow what the other selects may offer — and switching
-  // --partition off changes the partition as surely as picking another one does.
-  if (e.target.name === "account" || opt === "account") fillQos();
+  // Switching --partition off changes the partition as surely as picking
+  // another one does, which narrows what the GPU model select may offer.
   if (e.target.name === "partition" || opt === "partition") fillGpuModels();
   // The partition and the GPU count decide several of the seeds, so a change to
   // either refreshes the explanations even though it seeds nothing itself.

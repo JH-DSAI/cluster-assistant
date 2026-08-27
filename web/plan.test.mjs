@@ -201,15 +201,15 @@ test("jobSizeScore and ageScore follow SLURM's formulas", () => {
 });
 
 test("estimatePriority scores a fresh job with no age at all", () => {
-  const req = toRequest({ partition: "gpu", account: "lab", qos: "normal", nodes: 2, ntasksPerNode: 1, cpusPerTask: 50, gpusPerNode: 2, memValue: 64, memUnit: "G", memPer: "node", days: 1 });
+  const req = toRequest({ partition: "gpu", account: "lab", nodes: 2, ntasksPerNode: 1, cpusPerTask: 50, gpusPerNode: 2, memValue: 64, memUnit: "G", memPer: "node", days: 1 });
   const est = estimatePriority(req, gpu(), pm);
   assert.equal(req.cpus, 100);
   assert.equal(est.jobsize, 2500 * (2 / 100 + 100 / 10000)); // 75
   assert.equal(est.base, 75); // no other factor is in use on this cluster
   assert.equal(est.start, 75);
   assert.equal(est.atCap, 75 + 5000);
-  assert.equal(est.peers, gpu().queue.length); // matched on account and QOS
-  assert.match(est.scope, /this account and QOS/);
+  assert.equal(est.peers, gpu().queue.length); // matched on account
+  assert.match(est.scope, /this account in this partition/);
 });
 
 test("estimatePriority reads the account factors off jobs already queued", () => {
@@ -327,17 +327,9 @@ test("feasibility passes a request the partition can hold", () => {
   assert.equal(checks.find((c) => c.label === "Free now").level, "ok");
 });
 
-test("feasibility says a QOS cap the job breaches on its own is a hard stop", () => {
-  const req = toRequest({ partition: "gpu", account: "lab", qos: "small", nodes: 1, ntasksPerNode: 1, cpusPerTask: 8, gpusPerNode: 4, days: 1 });
-  const bad = feasibility(req, gpu(), model, pm).filter((c) => c.level === "bad");
-  assert.equal(bad.length, 1);
-  assert.equal(bad[0].label, "QOS GPUs");
-  assert.match(bad[0].text, /allows 2 GPUs per user/);
-});
-
 test("feasibility warns rather than fails when the cluster is merely busy", () => {
   // Legal at every per-node limit and under no QOS, but far more than is free.
-  const req = toRequest({ partition: "gpu", account: "lab", qos: "", nodes: 40, ntasksPerNode: 1, cpusPerTask: 100, gpusPerNode: 8, days: 1 });
+  const req = toRequest({ partition: "gpu", account: "lab", nodes: 40, ntasksPerNode: 1, cpusPerTask: 100, gpusPerNode: 8, days: 1 });
   const checks = feasibility(req, gpu(), model, pm);
   assert.equal(checks.filter((c) => c.level === "bad").length, 0); // 40 of 50 nodes is legal
   assert.equal(checks.find((c) => c.label === "Free now").level, "warn");
@@ -363,7 +355,7 @@ test("timeSpec writes the form sbatch documents", () => {
 
 test("sbatchPreamble emits only the directives that were set", () => {
   const lines = sbatchPreamble({
-    jobName: "train", partition: "gpu", account: "lab", qos: "normal",
+    jobName: "train", partition: "gpu", account: "lab",
     nodes: 1, ntasksPerNode: 1, cpusPerTask: 8, gpusPerNode: 2, gpuModel: "a100",
     memValue: 64, memUnit: "G", memPer: "node", days: 1, hours: 0, minutes: 0,
     output: "logs/%x-%j.out", error: "", mailType: "", constraint: "",
@@ -373,7 +365,6 @@ test("sbatchPreamble emits only the directives that were set", () => {
     "#SBATCH --job-name=train",
     "#SBATCH --partition=gpu",
     "#SBATCH --account=lab",
-    "#SBATCH --qos=normal",
     "#SBATCH --nodes=1",
     "#SBATCH --ntasks-per-node=1",
     "#SBATCH --cpus-per-task=8",
@@ -676,16 +667,15 @@ test("feasibility enforces the limits only scontrol reports", () => {
   assert.equal(c2.find((x) => x.label === "MaxMemPerCPU")?.level, "info");
 });
 
-test("feasibility rejects a partition that will not take the account or QOS", () => {
+test("feasibility rejects a partition that will not take the account", () => {
   const m = withScontrol();
   const cpu = m.partitions.find((p) => p.name === "cpu");
   const req = effectiveRequest(
-    toRequest({ partition: "cpu", account: "poor", qos: "normal", nodes: 1, ntasksPerNode: 1, cpusPerTask: 4, hours: 1 }),
+    toRequest({ partition: "cpu", account: "poor", nodes: 1, ntasksPerNode: 1, cpusPerTask: 4, hours: 1 }),
     cpu,
   );
   const labels = feasibility(req, cpu, m, priorityModel(m)).filter((c) => c.level === "bad").map((c) => c.label);
   assert.ok(labels.includes("Account"), "AllowAccounts=lab excludes poor");
-  assert.ok(labels.includes("QOS allowed"), "AllowQos=small excludes normal");
   assert.ok(labels.includes("Partition"), "State=DOWN");
 });
 

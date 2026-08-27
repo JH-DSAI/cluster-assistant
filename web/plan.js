@@ -334,11 +334,10 @@ export function fitPriorityModel(model) {
 export function estimatePriority(req, part, pm) {
   const jobsize = jobSizeScore(req.nodes, req.cpus, pm);
 
-  // Peers first: same account and QOS in this partition, then progressively
-  // wider, because these factors do not depend on the request at all.
+  // Peers first: same account in this partition, then progressively wider,
+  // because these factors do not depend on the request at all.
   const queue = part?.queue?.filter((r) => r.factors) ?? [];
   const scopes = [
-    ["this account and QOS in this partition", (r) => r.account === req.account && r.qosname === req.qos],
     ["this account in this partition", (r) => r.account === req.account],
     ["this partition", () => true],
   ];
@@ -695,10 +694,6 @@ export function feasibility(req, part, model, pm) {
       add("bad", "Account", `${part.name} only accepts jobs from ${info.allowAccounts.join(", ")}.`);
     }
   }
-  if (info?.allowQos && req.qos && !info.allowQos.includes(req.qos)) {
-    add("bad", "QOS allowed", `${part.name} only accepts QOS ${info.allowQos.join(", ")}.`);
-  }
-
   // scontrol's MaxTime is authoritative; sinfo's TIMELIMIT string is a fallback.
   const limit = info ? info.maxTime : parseDuration(part.timelimit ?? "");
   // Already resolved to the partition's default where the job set none, so a
@@ -791,13 +786,11 @@ export function feasibility(req, part, model, pm) {
     }
   }
 
-  // A QOS cap the job would breach on its own is a hard stop, not a wait. Both
-  // the job's QOS and the partition's own apply.
-  const qosNames = [req.qos, info?.qos].filter(Boolean);
-  for (const name of qosNames) {
-    const qos = model.qosList?.find((q) => q.name === name);
-    if (!qos) continue;
-    const whose = name === info?.qos && name !== req.qos ? ` (attached to ${part.name})` : "";
+  // A QOS cap the job would breach on its own is a hard stop, not a wait —
+  // the partition's own attached QOS applies to every job that lands there.
+  const qos = info?.qos ? model.qosList?.find((q) => q.name === info.qos) : null;
+  if (qos) {
+    const whose = ` (attached to ${part.name})`;
     // A per-QOS walltime ceiling, which no other dump reports and which can sit
     // far below the partition's own limit.
     if (qos.maxWall > 0) {
@@ -974,7 +967,6 @@ export function sbatchPreamble(f) {
   put("job-name", f.jobName);
   put("partition", f.partition);
   put("account", f.account);
-  put("qos", f.qos);
   put("array", f.array);
   put("nodes", f.nodes);
   put("ntasks-per-node", f.ntasksPerNode);
@@ -1008,7 +1000,6 @@ export const PREAMBLE_OPTIONS = [
   { key: "jobName", flag: "job-name", inputs: ["jobName"] },
   { key: "partition", flag: "partition", inputs: ["partition"] },
   { key: "account", flag: "account", inputs: ["account"] },
-  { key: "qos", flag: "qos", inputs: ["qos"] },
   { key: "array", flag: "array", inputs: ["array"] },
   { key: "nodes", flag: "nodes", inputs: ["nodes"] },
   { key: "ntasksPerNode", flag: "ntasks-per-node", inputs: ["ntasksPerNode"] },
@@ -1075,7 +1066,6 @@ export function preambleDefaults(model, part, req = null) {
   // The default account and the default QOS both live on the submitter's own
   // association, and the association dump carries neither — see README.
   put("account", null, "the job is charged to your association's default account, which no dump reports.");
-  put("qos", null, `the job runs under your association's DefaultQOS${info?.qos ? `, plus ${where}'s own ${info.qos}` : ""} — no dump reports which that is.`);
   put("array", { array: "0-9" }, "the script runs once, as a single job.");
   put("nodes", { nodes: 1 }, "SLURM allocates one node.", true);
   put("ntasksPerNode", { ntasksPerNode: 1 }, "SLURM runs one task per node.", true);
@@ -1150,7 +1140,6 @@ export function toRequest(f) {
   return {
     partition: f.partition,
     account: f.account,
-    qos: f.qos,
     nodes,
     ntasksPerNode: Math.max(1, f.ntasksPerNode || 1),
     cpusPerNode,
