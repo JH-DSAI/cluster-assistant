@@ -114,6 +114,14 @@ const size = (r) =>
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
+// Renders an optional {key: value} map as ` data-key="value"` attributes.
+const dataAttrs = (data) =>
+  data
+    ? Object.entries(data)
+        .map(([k, v]) => ` data-${k}="${esc(v)}"`)
+        .join("")
+    : "";
+
 // scontrol_partition.txt's AllowAccounts, shown beside the name so users can
 // tell at a glance which partitions their account may use. Account names are
 // SLURM logins (lowercase); this is how they're styled for display.
@@ -309,7 +317,7 @@ function segments(parts, widthPct = 100, extraClass = "", labeled = false) {
     .filter((p) => p.value > 0)
     .map(
       (p) =>
-        `<span class="seg" style="flex:${p.value};--c:${p.color}" data-tip="${esc(p.tip)}"><i>${
+        `<span class="seg" style="flex:${p.value};--c:${p.color}" data-tip="${esc(p.tip)}"${dataAttrs(p.data)}><i>${
           labeled ? `<span class="seg-label" style="color:${p.textColor ?? "#fff"}">${n(p.value)}</span>` : ""
         }</i></span>`,
     )
@@ -317,9 +325,14 @@ function segments(parts, widthPct = 100, extraClass = "", labeled = false) {
   return `<div class="bar${cls ? ` ${cls}` : ""}" style="width:${widthPct}%">${segs}</div>`;
 }
 
+// Node names behind one state group in a partition, or every node in it —
+// used both for the tooltip and to seed the right-click "Interact…" menu.
+const groupNodeNames = (p, group) => p.stateRows.filter((r) => r.group === group).flatMap((r) => r.nodes);
+const partitionNodeNames = (p) => p.stateRows.flatMap((r) => r.nodes);
+
 function nodeTip(p, group) {
   const rows = p.stateRows.filter((r) => r.group === group);
-  const names = rows.flatMap((r) => r.nodes);
+  const names = groupNodeNames(p, group);
   const shown = names.slice(0, 12).join(", ") + (names.length > 12 ? `, +${names.length - 12} more` : "");
   const states = [...new Set(rows.map((r) => r.state + r.flags))].join(", ");
   const flags = [...new Set(rows.flatMap((r) => [...r.flags]))].map((f) => FLAG_LABEL[f] ?? f);
@@ -333,6 +346,10 @@ function nodeTip(p, group) {
   );
 }
 
+// Right-click target data for one partition's segment or whole row — omitted
+// when sinfo has no NODELIST column, so there is nothing to name in the menu.
+const nodeInteractData = (p, names) => (names.length ? { partition: p.name, nodes: names.join(",") } : undefined);
+
 function nodesCard(parts) {
   const totals = Object.fromEntries(STATE_GROUPS.map((g) => [g, 0]));
   for (const p of parts) for (const g of STATE_GROUPS) totals[g] += p.byGroup[g];
@@ -345,18 +362,27 @@ function nodesCard(parts) {
           .join("")}<th>Time limit</th><th>Avail</th></tr></thead><tbody>${parts
           .map(
             (p) =>
-              `<tr><td>${esc(partLabel(p))}${p.isDefault ? ' <span class="dim">default</span>' : ""}</td>` +
+              `<tr${dataAttrs(nodeInteractData(p, partitionNodeNames(p)))}><td>${esc(partLabel(p))}${
+                p.isDefault ? ' <span class="dim">default</span>' : ""
+              }</td>` +
               `<td class="num">${n(p.nodes)}</td>` +
-              present.map((g) => `<td class="num">${p.byGroup[g] || '<span class="dim">0</span>'}</td>`).join("") +
+              present
+                .map(
+                  (g) =>
+                    `<td class="num"${dataAttrs(p.byGroup[g] ? nodeInteractData(p, groupNodeNames(p, g)) : undefined)}>${
+                      p.byGroup[g] || '<span class="dim">0</span>'
+                    }</td>`,
+                )
+                .join("") +
               `<td>${esc(p.timelimit ?? "-")}</td><td>${esc(p.avail ?? "-")}</td></tr>`,
           )
           .join("")}</tbody></table></div>`
       : `<div class="rows">${parts
           .map(
             (p) =>
-              `<div class="row row-solo"><div class="row-label">${esc(partLabel(p))}${
-                p.isDefault ? '<span class="dflt">*</span>' : ""
-              }</div>` +
+              `<div class="row row-solo"${dataAttrs(nodeInteractData(p, partitionNodeNames(p)))}><div class="row-label">${esc(
+                partLabel(p),
+              )}${p.isDefault ? '<span class="dflt">*</span>' : ""}</div>` +
               (p.nodes === 0
                 ? `<div class="bar"><span class="none">no node data in sinfo.txt</span></div>`
                 : segments(
@@ -365,6 +391,7 @@ function nodesCard(parts) {
                       color: GROUP_COLOR[g],
                       textColor: GROUP_TEXT[g],
                       tip: nodeTip(p, g),
+                      data: nodeInteractData(p, groupNodeNames(p, g)),
                     })),
                     100,
                     "",
@@ -1839,21 +1866,52 @@ function costCard(req, part) {
     .join("");
 
   // Which of these three the bill is actually driven by, so the row that moves
-  // the bill is visually distinct from the ones that don't.
+  // the bill is visually distinct from the ones that don't. The raw hours above
+  // don't carry TRESBillingWeights, so the biggest raw row is not necessarily the
+  // one that wins MAX_TRES — a "Weighted" column applies the same per-node weight
+  // and per-run scaling jobBilling() uses, so the bolded winner there always
+  // matches the driver.
   const driverTres = bill?.driver?.tres ?? null;
+  const termByTres = new Map((bill?.terms ?? []).map((t) => [t.tres, t]));
+  const taskMult = req.tasks > 1 ? req.tasks : 1;
+  const weightOf = (tres) => bill?.weights?.get(tres) ?? null;
+  const weightedHours = (tres) => {
+    const t = termByTres.get(tres);
+    return t && bill ? (t.value * req.nodes * req.minutes * bill.usageFactor * taskMult) / 60 : null;
+  };
+  const gpuWeight = weightOf("gres/gpu") ?? weightOf(`gres/gpu:${req.gpuModel}`);
+
   const costRows = [
-    { tres: "cpu", label: "CPU-hours", value: n(Math.round(total.cpuHours)), sub: `${plural(req.cpus, "core")} × ${over}` },
     {
-      tres: "node",
-      label: "Node-hours",
-      value: n(Math.round(total.nodeHours * 10) / 10),
-      sub: `${plural(req.nodes, "node")} × ${over}`,
+      tres: "cpu",
+      label: "CPU-hours",
+      value: n(Math.round(total.cpuHours)),
+      sub: `${plural(req.cpus, "core")} × ${over}`,
+      weight: weightOf("cpu"),
+      weightUnit: "core",
+      weighted: weightedHours("cpu"),
     },
+    ...(req.gpus
+      ? [
+          {
+            tres: "gres/gpu",
+            label: "GPU-hours",
+            value: n(Math.round(total.gpuHours)),
+            sub: `${plural(req.gpus, "GPU")} × ${over}`,
+            weight: gpuWeight,
+            weightUnit: "GPU",
+            weighted: weightedHours("gres/gpu"),
+          },
+        ]
+      : []),
     {
       tres: "mem",
       label: "GB-hours",
       value: n(Math.round(total.memGBMinutes / 60)),
       sub: `${n(Math.round(req.memMB / 1024))} GB × ${over}`,
+      weight: weightOf("mem"),
+      weightUnit: "GB",
+      weighted: weightedHours("mem"),
     },
   ];
 
@@ -1868,15 +1926,26 @@ function costCard(req, part) {
     costTip,
   )}">?</span></div>
     ${topTiles ? `<div class="kpis plan-kpis">${topTiles}</div>` : ""}
-    <div class="scroll"><table><thead><tr><th>Resource</th><th class="num">Over the run</th><th></th></tr></thead>
+    <div class="scroll"><table><thead><tr><th>Resource</th><th class="num">Over the run</th>${
+      bill ? `<th class="num">Weighted</th>` : ""
+    }<th></th></tr></thead>
       <tbody>
         ${costRows
-          .map(
-            (r) =>
-              `<tr><td>${esc(r.label)}</td><td class="num">${
-                r.tres === driverTres ? `<b>${r.value}</b>` : r.value
-              }</td><td class="dim">${esc(r.sub)}</td></tr>`,
-          )
+          .map((r) => {
+            const subText = r.weight != null ? `${r.sub} · weight ${n(r.weight)}/${r.weightUnit}` : r.sub;
+            const weightedCell = bill
+              ? `<td class="num">${
+                  r.weighted == null
+                    ? "–"
+                    : r.tres === driverTres
+                      ? `<b>${n(Math.round(r.weighted))}</b>`
+                      : n(Math.round(r.weighted))
+                }</td>`
+              : "";
+            return `<tr><td>${esc(r.label)}</td><td class="num">${r.value}</td>${weightedCell}<td><span class="tip-icon" data-tip="${esc(
+              subText,
+            )}">?</span></td></tr>`;
+          })
           .join("")}
       </tbody></table></div>
     ${
@@ -2190,6 +2259,83 @@ document.addEventListener("pointermove", (e) => {
 
 document.addEventListener("pointerout", (e) => {
   if (e.target.closest("[data-tip]")) tip.dataset.show = "0";
+});
+
+// ---------------------------------------------------------------- node interact menu
+
+const nodeCtx = document.getElementById("node-ctx");
+const nodePanel = document.getElementById("node-interact");
+const interactNode = document.getElementById("interact-node");
+const interactCores = document.getElementById("interact-cores");
+const interactGpus = document.getElementById("interact-gpus");
+const interactCopy = document.getElementById("interact-copy");
+// Set from the element that was right-clicked, read back when "Copy command" fires.
+let interactSource = null;
+
+function closeNodeMenus() {
+  nodeCtx.hidden = true;
+  nodePanel.hidden = true;
+}
+
+// Clamped to the viewport, same idea as placeTip but anchored at a point rather
+// than the pointer's live position — these menus don't track the mouse.
+function placeAt(el, x, y) {
+  el.hidden = false;
+  const r = el.getBoundingClientRect();
+  el.style.left = `${Math.max(8, Math.min(x, window.innerWidth - r.width - 8))}px`;
+  el.style.top = `${Math.max(8, Math.min(y, window.innerHeight - r.height - 8))}px`;
+}
+
+document.addEventListener("contextmenu", (e) => {
+  const t = e.target.closest("[data-nodes]");
+  closeNodeMenus();
+  if (!t) return;
+  e.preventDefault();
+  interactSource = { partition: t.dataset.partition, nodes: [...new Set(t.dataset.nodes.split(","))] };
+  placeAt(nodeCtx, e.clientX, e.clientY);
+});
+
+nodeCtx.addEventListener("click", (e) => {
+  if (!e.target.closest("[data-action='interact']") || !interactSource) return;
+  const r = nodeCtx.getBoundingClientRect();
+  document.getElementById("interact-partition").textContent = interactSource.partition;
+  interactNode.innerHTML = interactSource.nodes.map((nd) => `<option value="${esc(nd)}">${esc(nd)}</option>`).join("");
+  interactCores.value = "1";
+  interactGpus.value = "0";
+  interactCopy.textContent = "Copy command";
+  nodeCtx.hidden = true;
+  placeAt(nodePanel, r.left, r.top);
+});
+
+document.getElementById("interact-close").addEventListener("click", closeNodeMenus);
+
+nodePanel.addEventListener("click", (e) => {
+  const btn = e.target.closest(".step");
+  if (!btn) return;
+  const input = document.getElementById(btn.dataset.target);
+  const min = input.min === "" ? -Infinity : Number(input.min);
+  input.value = String(Math.max(min, (Number(input.value) || 0) + Number(btn.dataset.delta)));
+});
+
+interactCopy.addEventListener("click", async () => {
+  const cores = interactCores.value || "1";
+  const gpus = interactGpus.value || "0";
+  const cmd = `interact -w ${interactNode.value} -p ${interactSource.partition} -n ${cores} -g ${gpus}`;
+  try {
+    await navigator.clipboard.writeText(cmd);
+    interactCopy.textContent = "Copied";
+  } catch {
+    interactCopy.textContent = "Copy failed — select it by hand";
+  }
+  setTimeout(() => (interactCopy.textContent = "Copy command"), 1600);
+});
+
+document.addEventListener("click", (e) => {
+  if ((!nodeCtx.hidden || !nodePanel.hidden) && !e.target.closest("#node-ctx, #node-interact")) closeNodeMenus();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeNodeMenus();
 });
 
 function onCardClick(e) {

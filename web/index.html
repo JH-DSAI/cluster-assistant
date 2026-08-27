@@ -214,6 +214,36 @@
     </div>
 
     <div id="tip" role="tooltip"></div>
+
+    <div id="node-ctx" class="ctx-menu" hidden>
+      <button type="button" data-action="interact">Interact…</button>
+    </div>
+
+    <div id="node-interact" class="interact-panel" hidden>
+      <div class="interact-head">
+        <b id="interact-partition"></b>
+        <button type="button" id="interact-close" aria-label="Close">×</button>
+      </div>
+      <label class="interact-row">Node
+        <select id="interact-node"></select>
+      </label>
+      <label class="interact-row">Cores
+        <span class="stepper">
+          <button type="button" class="step" data-target="interact-cores" data-delta="-1" aria-label="Decrease cores">−</button>
+          <input type="number" id="interact-cores" min="1" step="1" value="1" />
+          <button type="button" class="step" data-target="interact-cores" data-delta="1" aria-label="Increase cores">+</button>
+        </span>
+      </label>
+      <label class="interact-row">GPUs
+        <span class="stepper">
+          <button type="button" class="step" data-target="interact-gpus" data-delta="-1" aria-label="Decrease GPUs">−</button>
+          <input type="number" id="interact-gpus" min="0" step="1" value="0" />
+          <button type="button" class="step" data-target="interact-gpus" data-delta="1" aria-label="Increase GPUs">+</button>
+        </span>
+      </label>
+      <button type="button" id="interact-copy" class="primary">Copy command</button>
+    </div>
+
     <script type="module" src="app.js"></script>
   </body>
 </html>

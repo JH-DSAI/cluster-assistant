@@ -689,6 +689,29 @@ test("feasibility rejects a partition that will not take the account or QOS", ()
   assert.ok(labels.includes("Partition"), "State=DOWN");
 });
 
+test("feasibility admits an account through the assoc_mgr lineage, not just an exact name match", () => {
+  // AllowAccounts names the root account "lab"; "labsub" is a descendant of
+  // it, the way a lab's sub-accounts or per-PI accounts descend from a
+  // university-wide root in practice. A flat name comparison would wrongly
+  // reject it.
+  const assocMgrText = [
+    "Association Records",
+    "",
+    "ClusterName=x Account=lab UserName= Partition= Priority=0 ID=1",
+    "    ParentAccount= Lineage=/lab/ DefAssoc=No",
+    "ClusterName=x Account=labsub UserName= Partition= Priority=0 ID=2",
+    "    ParentAccount=lab(1) Lineage=/lab/labsub/ DefAssoc=No",
+  ].join("\n");
+  const m = withScontrol({ assocMgrText });
+  const cpu = m.partitions.find((p) => p.name === "cpu");
+  const req = effectiveRequest(
+    toRequest({ partition: "cpu", account: "labsub", qos: "small", nodes: 1, ntasksPerNode: 1, cpusPerTask: 4, hours: 1 }),
+    cpu,
+  );
+  const labels = feasibility(req, cpu, m, priorityModel(m)).filter((c) => c.level === "bad").map((c) => c.label);
+  assert.ok(!labels.includes("Account"), "labsub descends from lab in the assoc_mgr lineage");
+});
+
 test("feasibility applies the QOS the partition attaches, not just the job's", () => {
   // The cpu partition attaches QOS "small", which caps GPUs at 2 per user — the
   // job carries no QOS of its own, so this cap is only visible via scontrol.

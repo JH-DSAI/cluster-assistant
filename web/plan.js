@@ -641,6 +641,23 @@ export function jobCost(req) {
   };
 }
 
+// AllowAccounts names a *root* account (e.g. "jhu"); a job's account is
+// usually a descendant of it (lab/PI sub-accounts, then per-user leaves).
+// `scontrol show assoc_mgr`'s Lineage string is the flattened ancestor path
+// for an account, so walking it is what tells us the job is actually under
+// that root rather than requiring an exact name match. Falls back to null
+// when the dump lacks assoc_mgr or the account, so callers can fall back to
+// the flat comparison instead.
+function accountAncestors(model, account) {
+  const rows = model?.assocMgr?.assoc;
+  if (!rows || !account) return null;
+  const row =
+    rows.find((a) => a.account && !a.user && a.account.toLowerCase() === account.toLowerCase()) ??
+    rows.find((a) => a.account && a.account.toLowerCase() === account.toLowerCase());
+  if (!row?.lineage) return null;
+  return row.lineage.split("/").filter((s) => s && !s.startsWith("0-"));
+}
+
 /**
  * Whether the request can run at all, and whether it could start now.
  *
@@ -669,8 +686,14 @@ export function feasibility(req, part, model, pm) {
     add("bad", "Partition", `${part.name} is ${part.avail}, so nothing will start there.`);
   }
 
-  if (info?.allowAccounts && req.account && !info.allowAccounts.includes(req.account)) {
-    add("bad", "Account", `${part.name} only accepts jobs from ${info.allowAccounts.join(", ")}.`);
+  if (info?.allowAccounts && req.account) {
+    const ancestors = accountAncestors(model, req.account);
+    const allowed = ancestors
+      ? ancestors.some((a) => info.allowAccounts.some((allow) => allow.toLowerCase() === a.toLowerCase()))
+      : info.allowAccounts.includes(req.account);
+    if (!allowed) {
+      add("bad", "Account", `${part.name} only accepts jobs from ${info.allowAccounts.join(", ")}.`);
+    }
   }
   if (info?.allowQos && req.qos && !info.allowQos.includes(req.qos)) {
     add("bad", "QOS allowed", `${part.name} only accepts QOS ${info.allowQos.join(", ")}.`);
