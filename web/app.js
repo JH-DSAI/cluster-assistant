@@ -2299,7 +2299,9 @@ nodeCtx.addEventListener("click", (e) => {
   if (!e.target.closest("[data-action='interact']") || !interactSource) return;
   const r = nodeCtx.getBoundingClientRect();
   document.getElementById("interact-partition").textContent = interactSource.partition;
-  interactNode.innerHTML = interactSource.nodes.map((nd) => `<option value="${esc(nd)}">${esc(nd)}</option>`).join("");
+  interactNode.innerHTML =
+    `<option value="">Any</option>` +
+    interactSource.nodes.map((nd) => `<option value="${esc(nd)}">${esc(nd)}</option>`).join("");
   interactCores.value = "1";
   interactGpus.value = "0";
   interactCopy.textContent = "Copy command";
@@ -2320,7 +2322,9 @@ nodePanel.addEventListener("click", (e) => {
 interactCopy.addEventListener("click", async () => {
   const cores = interactCores.value || "1";
   const gpus = interactGpus.value || "0";
-  const cmd = `interact -w ${interactNode.value} -p ${interactSource.partition} -n ${cores} -g ${gpus}`;
+  const cmd = interactNode.value
+    ? `interact -w ${interactNode.value} -p ${interactSource.partition} -n ${cores} -g ${gpus}`
+    : `interact -p ${interactSource.partition} -n ${cores} -g ${gpus}`;
   try {
     await navigator.clipboard.writeText(cmd);
     interactCopy.textContent = "Copied";
