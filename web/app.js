@@ -26,6 +26,7 @@ import {
   preambleDefaults,
   PREAMBLE_OPTIONS,
 } from "./plan.js";
+import { extractEntries } from "./archive.js";
 
 const FILES = {
   sinfoText: "sinfo.txt",
@@ -40,13 +41,11 @@ const FILES = {
   assocMgrText: "scontrol_assoc_mgr.txt",
   sacctmgrQosText: "sacctmgr_qos.txt",
   scontrolNodeText: "scontrol_node.txt",
+  sacctHistText: "sacct_hist.txt",
 };
-// Read once per explicit load rather than every refresh: the history dump is
-// two orders of magnitude larger than the rest and describes the past, which
-// does not change between one minute and the next.
-const SLOW_FILES = { sacctHistText: "sacct_hist.txt" };
-const DATA_DIR = "../data/";
-const REFRESH_MS = 60_000;
+// A missing history dump costs one card, not the page, so it gets no error banner.
+const OPTIONAL_FILES = new Set(["sacctHistText"]);
+const FILENAME_TO_KEY = Object.fromEntries(Object.entries(FILES).map(([key, name]) => [name, key]));
 const STALE_MS = 15 * 60_000;
 const TOP_N = 10;
 
@@ -164,46 +163,59 @@ let prioModel = null;
 
 // ---------------------------------------------------------------- loading
 
-async function loadFile(name) {
-  const res = await fetch(`${DATA_DIR}${name}?t=${Date.now()}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
-  const lm = res.headers.get("last-modified");
-  return { text: await res.text(), at: lm ? new Date(lm) : null };
+// Filled in from uploads and kept across them, so re-uploading just one file
+// tops up the set rather than discarding everything else already in place.
+const texts = {};
+
+async function handleUpload(fileList) {
+  const files = [...fileList];
+  if (!files.length) return;
+  const main = document.getElementById("main");
+  main.dataset.busy = "1";
+  const uploadErrors = [];
+
+  for (const file of files) {
+    let entries;
+    try {
+      entries = await extractEntries(file);
+    } catch (e) {
+      uploadErrors.push(`${file.name}: ${e.message}`);
+      continue;
+    }
+    for (const entry of entries) {
+      const key = FILENAME_TO_KEY[entry.name.split("/").pop()];
+      if (!key) continue;
+      texts[key] = entry.text;
+      stamps[FILES[key]] = entry.mtime ?? new Date();
+    }
+  }
+
+  rebuild(uploadErrors);
+  main.dataset.busy = "0";
 }
 
-// Held across refreshes so the large history dump is fetched once. `slow` forces
-// a re-read, which the Refresh button does.
-let slowTexts = null;
-
-async function load({ slow = slowTexts === null } = {}) {
-  const main = document.getElementById("main");
-  main.dataset.busy = model ? "1" : "0";
-  const errors = [];
-  const texts = {};
-  stamps = {};
-  const wanted = { ...FILES, ...(slow ? SLOW_FILES : {}) };
-
-  await Promise.all(
-    Object.entries(wanted).map(async ([key, name]) => {
-      try {
-        const { text, at } = await loadFile(name);
-        texts[key] = text;
-        stamps[name] = at;
-      } catch (e) {
-        texts[key] = "";
-        // A history dump that is absent or unreadable costs one card, not the
-        // page, so it is not worth an error banner.
-        if (!(key in SLOW_FILES)) errors.push(e.message);
-      }
-    }),
-  );
-
-  if (slow) slowTexts = Object.fromEntries(Object.keys(SLOW_FILES).map((k) => [k, texts[k] ?? ""]));
-  else Object.assign(texts, slowTexts);
-
-  document.getElementById("errors").innerHTML = errors
-    .map((m) => `<div class="error">${esc(m)} — that section will be empty. Is the dump process running?</div>`)
+function uploadChecklist() {
+  const missing = Object.entries(FILES).filter(([key]) => !(key in texts) && !OPTIONAL_FILES.has(key));
+  if (!missing.length) return "";
+  const items = Object.entries(FILES)
+    .map(([key, name]) => {
+      const done = key in texts;
+      return `<li class="${done ? "done" : "missing"}">${esc(name)}${
+        OPTIONAL_FILES.has(key) ? ' <span class="dim">(optional)</span>' : ""
+      }</li>`;
+    })
     .join("");
+  return `<div class="checklist">
+    <p class="checklist-head">Waiting on ${n(missing.length)} file${
+      missing.length === 1 ? "" : "s"
+    } — the sections that need them will be empty until they're uploaded:</p>
+    <ul>${items}</ul>
+  </div>`;
+}
+
+function rebuild(uploadErrors = []) {
+  document.getElementById("errors").innerHTML =
+    uploadErrors.map((m) => `<div class="error">${esc(m)}</div>`).join("") + uploadChecklist();
 
   // Wait times are measured from when the data was captured, not from the
   // browser clock, so they stay put while the page is open.
@@ -214,7 +226,6 @@ async function load({ slow = slowTexts === null } = {}) {
   render();
   // renderFilters() always unhides the bar; the plan tab has no use for it.
   document.getElementById("filters").hidden = state.tab === "plan";
-  main.dataset.busy = "0";
 }
 
 // ---------------------------------------------------------------- scoping
@@ -292,7 +303,7 @@ function renderFreshness() {
   const dates = Object.values(stamps).filter(Boolean);
   const el = document.getElementById("freshness");
   if (!dates.length) {
-    el.textContent = "data timestamps unavailable";
+    el.textContent = "no data uploaded yet";
     return;
   }
   const oldest = new Date(Math.min(...dates.map((d) => +d)));
@@ -301,7 +312,7 @@ function renderFreshness() {
   const rel = mins < 1 ? "just now" : mins === 1 ? "1 min ago" : `${mins} min ago`;
   el.innerHTML =
     `data from ${esc(oldest.toLocaleTimeString())} (${rel})` +
-    (age > STALE_MS ? ` <span class="stale">stale — dump may have stopped</span>` : "");
+    (age > STALE_MS ? ` <span class="stale">stale — upload a fresh dump</span>` : "");
 }
 
 // ---------------------------------------------------------------- pieces
@@ -2453,12 +2464,38 @@ document.getElementById("f-clear").addEventListener("click", () => {
   render();
 });
 
-document.getElementById("refresh").addEventListener("click", () => load({ slow: true }));
-
 document.getElementById("theme").addEventListener("click", () => {
   const dark = matchMedia("(prefers-color-scheme: dark)").matches;
   const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
   document.documentElement.dataset.theme = cur === "dark" ? "light" : "dark";
+});
+
+// ---------------------------------------------------------------- upload
+
+const uploadInput = document.getElementById("upload-input");
+const uploadZone = document.getElementById("upload-zone");
+
+uploadInput.addEventListener("change", (e) => {
+  handleUpload(e.target.files);
+  e.target.value = ""; // allow re-selecting the same file(s) to re-upload them
+});
+
+uploadZone.addEventListener("click", (e) => {
+  if (!e.target.closest("input")) uploadInput.click();
+});
+uploadZone.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    uploadInput.click();
+  }
+});
+
+for (const evt of ["dragover", "dragleave", "drop"]) uploadZone.addEventListener(evt, (e) => e.preventDefault());
+uploadZone.addEventListener("dragover", () => uploadZone.classList.add("dragover"));
+uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("dragover"));
+uploadZone.addEventListener("drop", (e) => {
+  uploadZone.classList.remove("dragover");
+  handleUpload(e.dataTransfer.files);
 });
 
 // ?theme=dark / ?theme=light forces a theme, for kiosk screens and screenshots.
@@ -2467,11 +2504,5 @@ const forced = params.get("theme");
 if (forced === "dark" || forced === "light") document.documentElement.dataset.theme = forced;
 if (params.get("tab") === "plan") switchTab("plan");
 
-let timer = setInterval(() => load(), REFRESH_MS);
-document.getElementById("auto").addEventListener("change", (e) => {
-  clearInterval(timer);
-  if (e.target.checked) timer = setInterval(() => load(), REFRESH_MS);
-});
-
-load({ slow: true });
+rebuild();
 setInterval(renderFreshness, 30_000);

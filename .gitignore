@@ -10,3 +10,5 @@ wheels/
 .venv
 
 data/*.txt
+data/*.gz
+data/*.zip

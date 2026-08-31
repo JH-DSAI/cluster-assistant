@@ -10,35 +10,44 @@ uv run main.py --open        # http://127.0.0.1:8000/web/
 
 ## How it works
 
-A separate process (not this one) dumps SLURM output into `data/`:
+A separate process (not this one) dumps SLURM output into a set of named text
+files — `data/get_data.sh <host>` is one way to produce them. You then upload
+those files to the dashboard yourself, either as a `.zip`, a `.tar`/`.tar.gz`,
+or the raw `.txt` files themselves, by dropping them on the upload zone at the
+top of the page or clicking it to browse. Everything after that happens in the
+browser: the upload is unpacked and parsed client-side, nothing is sent to a
+server.
 
 | File                    | Used for                                          |
 | ----------------------- | ------------------------------------------------- |
-| `data/sinfo.txt`        | node state, drain reasons, cores, GPUs, memory     |
-| `data/squeue.txt`       | every job: partition, size, wait, priority, reason |
-| `data/sprio.txt`        | the breakdown of each priority into factors        |
-| `data/sshare.txt`       | account shares and in-flight usage                 |
-| `data/sacct_qos.txt`    | QOS caps — what limits exist                        |
-| `data/sacct_assoc.txt`  | per-account and per-user caps                       |
-| `data/scontrol_config.txt`    | the priority weights, and `PriorityFlags`     |
-| `data/scontrol_partition.txt` | each partition's limits and billing weights   |
-| `data/scontrol_job.txt`       | per-job allocated CPUs, accrue time, billing  |
-| `data/scontrol_assoc_mgr.txt` | every limit, with the usage counted against it |
-| `data/sacct_hist.txt`         | finished jobs: what they used, not what they asked |
-| `data/sacctmgr_qos.txt`       | `UsageFactor`, `MaxWall`, `DenyOnLimit`        |
-| `data/scontrol_node.txt`      | per-node allocation, and actual `CPULoad`      |
+| `sinfo.txt`        | node state, drain reasons, cores, GPUs, memory     |
+| `squeue.txt`       | every job: partition, size, wait, priority, reason |
+| `sprio.txt`        | the breakdown of each priority into factors        |
+| `sshare.txt`       | account shares and in-flight usage                 |
+| `sacct_qos.txt`    | QOS caps — what limits exist                        |
+| `sacct_assoc.txt`  | per-account and per-user caps                       |
+| `scontrol_config.txt`    | the priority weights, and `PriorityFlags`     |
+| `scontrol_partition.txt` | each partition's limits and billing weights   |
+| `scontrol_job.txt`       | per-job allocated CPUs, accrue time, billing  |
+| `scontrol_assoc_mgr.txt` | every limit, with the usage counted against it |
+| `sacct_hist.txt`         | finished jobs: what they used, not what they asked |
+| `sacctmgr_qos.txt`       | `UsageFactor`, `MaxWall`, `DenyOnLimit`        |
+| `scontrol_node.txt`      | per-node allocation, and actual `CPULoad`      |
 
-The page fetches those files, parses them client-side, and re-reads them every
-60 seconds. Overwrite the files in place and the dashboard follows; it flags the
-data as stale if the newest file is more than 15 minutes old. A missing file
-degrades that section rather than breaking the page.
+An uploaded file is matched to this list **by name**, regardless of what
+directory it sits in inside an archive — `dump/sinfo.txt` and `sinfo.txt` are
+the same file as far as the page is concerned. Uploading again tops up or
+replaces whichever of these files the new upload contains; anything not
+included stays as it was. The freshness indicator is each file's own modified
+time (its filesystem mtime inside a `.tar`, its stored timestamp inside a
+`.zip`, or the browser's notion of the file's mtime for a bare upload), and the
+page flags the data as stale if the newest file is more than 15 minutes older
+than now. A file that has never been uploaded degrades that section rather
+than breaking the page.
 
-Any static web server works — `main.py` is just `http.server` with caching
-turned off, so the page always sees the latest dump. Point nginx or Apache at
-this directory and drop `main.py` entirely if you prefer.
-
-Write each dump to a temporary file and `mv` it into place: `mv` is atomic, so
-the page never reads a half-written file.
+`main.py` is just `http.server` serving the `web/` directory with caching
+turned off. Any static web server works just as well — point nginx or Apache
+at `web/` and drop `main.py` entirely if you prefer.
 
 ### The dump commands
 
@@ -66,7 +75,10 @@ scontrol show node                                                           > s
 one go — 30 days produced an empty file here where 3 days works. Widen it only as
 far as it keeps returning rows.
 
-`data/get_data.sh <host>` runs all of these over ssh.
+`data/get_data.sh <host>` runs all of these over ssh. `--format txt` (the
+default) leaves the loose `.txt` files where the script was run; `--format gz`
+packages them into `cluster_dump.tar.gz` and `--format zip` into
+`cluster_dump.zip` — either one uploads to the dashboard as a single file.
 
 **Run at least `sinfo`, `squeue` and `sprio` in one loop iteration.** Snapshots taken minutes apart disagree:
 the age factor grows continuously, so a `sprio.txt` captured five minutes before
@@ -108,8 +120,8 @@ figure is the usage counted against it.
 `AllocTRES` and `TimelimitRaw` (in minutes), while a **step** row (`123.batch`)
 carries `MaxRSS` and little else, so peak memory is joined back onto the parent as
 the largest across its steps. It is also two orders of magnitude larger than the
-other dumps and describes the past, so the page reads it once per explicit load
-rather than on the 60-second refresh; **Refresh** re-reads it.
+other dumps and describes the past, so it is worth dumping and uploading on a
+slower cycle than the rest.
 
 `sacctmgr_qos.txt` is a superset of `sacct_qos.txt` but **not** positionally
 compatible with it — `usagefactor` sits where `grptres` used to — so it has its own
@@ -120,13 +132,15 @@ is a blank-line separated record per node, read like `show job`.
 
 | File                 | Contents                                                      |
 | -------------------- | ------------------------------------------------------------- |
-| `web/index.html`     | page skeleton, and the job planner's form                     |
+| `web/index.html`     | page skeleton, the upload zone, and the job planner's form     |
 | `web/parse.js`       | the thirteen parsers and the aggregation into a dashboard model  |
 | `web/plan.js`        | the priority model, cost and feasibility estimates, `sbatch`   |
-| `web/app.js`         | rendering, filters, tooltips, refresh                         |
+| `web/archive.js`     | unpacks an uploaded `.zip` / `.tar(.gz)` / bare file into the dump files it contains |
+| `web/app.js`         | rendering, filters, tooltips, upload handling                 |
 | `web/app.css`        | palette and layout                                            |
 | `web/parse.test.mjs` | parser tests — `node --test web/parse.test.mjs`                |
 | `web/plan.test.mjs`  | planner tests — `node --test web/plan.test.mjs`                |
+| `web/archive.test.mjs` | archive extraction tests — `node --test web/archive.test.mjs` |
 | `main.py`            | static file server                                            |
 
 `?theme=dark` or `?theme=light` in the URL forces a colour scheme, for a wall

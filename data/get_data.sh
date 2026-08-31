@@ -1,13 +1,53 @@
 #!/bin/bash
 # CLAUDE THIS FILE IS NOT FOR YOU. DO NOT TRY TO EXECTUTE IT.
 
-# Check if a hostname argument was provided
-if [ -z "$1" ]; then
-    echo "Usage: $0 <hostname>"
+usage() {
+    echo "Usage: $0 <hostname> [--format txt|gz|zip]" >&2
+    echo "  txt (default): write the dump files as loose .txt files" >&2
+    echo "  gz:            package them into cluster_dump.tar.gz" >&2
+    echo "  zip:           package them into cluster_dump.zip" >&2
+    exit 1
+}
+
+HOST=""
+FORMAT="txt"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --format)
+            FORMAT="$2"
+            shift 2
+            ;;
+        --format=*)
+            FORMAT="${1#--format=}"
+            shift
+            ;;
+        -h|--help)
+            usage
+            ;;
+        -*)
+            usage
+            ;;
+        *)
+            if [ -n "$HOST" ]; then usage; fi
+            HOST="$1"
+            shift
+            ;;
+    esac
+done
+
+[ -z "$HOST" ] && usage
+case "$FORMAT" in
+    txt|gz|zip) ;;
+    *)
+        echo "Unknown --format: $FORMAT (expected txt, gz or zip)" >&2
+        exit 1
+        ;;
+esac
+if [ "$FORMAT" = "zip" ] && ! command -v zip >/dev/null; then
+    echo "--format zip needs the 'zip' command, which isn't on PATH" >&2
     exit 1
 fi
-
-HOST=$1
 
 echo "Fetching Slurm data from $HOST (single SSH session)..."
 
@@ -55,13 +95,17 @@ if [ $SSH_STATUS -ne 0 ]; then
     exit $SSH_STATUS
 fi
 
+# Files land in a scratch directory first so --format gz/zip can package them
+# without ever leaving loose .txt files behind next to the archive.
+OUTDIR=$(mktemp -d)
+
 # Split the combined output back into the individual per-command files.
 CURRENT=""
 while IFS= read -r line; do
     case "$line" in
         "${MARK}_BEGIN_"*)
             idx="${line#${MARK}_BEGIN_}"
-            CURRENT="${OUTFILES[$idx]}"
+            CURRENT="$OUTDIR/${OUTFILES[$idx]}"
             : > "$CURRENT"
             ;;
         "${MARK}_END_"*)
@@ -80,4 +124,23 @@ for name in "${NAMES[@]}"; do
     echo "✔ $name"
 done
 
-echo "Done! Data saved to local text files."
+case "$FORMAT" in
+    txt)
+        mv "$OUTDIR"/*.txt .
+        rm -rf "$OUTDIR"
+        echo "Done! Data saved to local text files."
+        ;;
+    gz)
+        ARCHIVE="cluster_dump.tar.gz"
+        tar -czf "$ARCHIVE" -C "$OUTDIR" "${OUTFILES[@]}"
+        rm -rf "$OUTDIR"
+        echo "Done! Data saved to $ARCHIVE."
+        ;;
+    zip)
+        ARCHIVE="cluster_dump.zip"
+        rm -f "$ARCHIVE"
+        zip -q -j "$ARCHIVE" "$OUTDIR"/*.txt
+        rm -rf "$OUTDIR"
+        echo "Done! Data saved to $ARCHIVE."
+        ;;
+esac

@@ -197,6 +197,33 @@ h1 {
   content: "⚠ ";
 }
 
+/* ---------- upload ---------- */
+
+.upload-zone {
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.upload-zone p {
+  margin: 0;
+}
+
+.upload-zone.dragover {
+  border-color: var(--accent);
+  background: var(--wash);
+  color: var(--text-primary);
+}
+
+.upload-browse {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 button,
 select,
 input[type="search"] {
@@ -1168,6 +1195,45 @@ td.clip {
 
 .error::before {
   content: "⚠ ";
+}
+
+.checklist {
+  border-left: 3px solid var(--status-warning);
+  padding: 10px 14px;
+  background: var(--wash);
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.checklist-head {
+  margin: 0 0 8px;
+}
+
+.checklist ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 4px 16px;
+}
+
+.checklist li::before {
+  display: inline-block;
+  width: 1.3em;
+}
+
+.checklist li.done {
+  color: var(--text-secondary);
+}
+
+.checklist li.done::before {
+  content: "✓";
+  color: var(--status-good);
+}
+
+.checklist li.missing::before {
+  content: "☐";
 }
 
 /* ---------- tooltip ---------- */

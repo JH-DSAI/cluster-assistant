@@ -17,14 +17,25 @@
       <header class="topbar">
         <h1>SLURM cluster status</h1>
         <div class="topbar-right">
-          <span class="freshness" id="freshness">loading…</span>
-          <label class="freshness"
-            ><input type="checkbox" id="auto" checked /> auto-refresh</label
-          >
-          <button id="refresh">Refresh</button>
+          <span class="freshness" id="freshness">no data uploaded yet</span>
           <button id="theme" title="Toggle light / dark">◐</button>
         </div>
       </header>
+
+      <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Upload cluster dump files">
+        <input
+          type="file"
+          id="upload-input"
+          multiple
+          hidden
+          accept=".zip,.tar,.tar.gz,.tgz,.gz,.txt"
+        />
+        <p>
+          Drop a <b>.zip</b> or <b>.tar</b>/<b>.tar.gz</b> of the dump files here, or the raw <b>.txt</b> files
+          themselves — or <span class="upload-browse">choose files</span>. Uploading again tops up or replaces
+          whichever files it contains.
+        </p>
+      </div>
 
       <nav class="tabs" role="tablist" aria-label="Views">
         <button role="tab" id="tab-status" data-tab="status" aria-selected="true" aria-controls="view-status">
