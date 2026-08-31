@@ -273,7 +273,15 @@ function renderFilters() {
   const valid = GROUP_FILTERS[state.partition] || model.partitions.some((p) => p.name === state.partition);
   sel.value = valid ? state.partition : "all";
   state.partition = sel.value;
-  document.getElementById("f-user").value = state.user;
+
+  const userSel = document.getElementById("f-user");
+  const users = [...new Set(model.jobs.map((j) => j.user).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  userSel.innerHTML = ['<option value="">All users</option>']
+    .concat(users.map((u) => `<option value="${esc(u)}">${esc(u)}</option>`))
+    .join("");
+  userSel.value = users.includes(state.user) ? state.user : "";
+  state.user = userSel.value;
+
   document.getElementById("filters").hidden = false;
   document.getElementById("filter-note").textContent = state.user.trim()
     ? "User filter scopes jobs and the priority queue; node status stays partition-wide."
@@ -2432,14 +2440,10 @@ document.getElementById("f-part").addEventListener("change", (e) => {
   render();
 });
 
-let userTimer;
-document.getElementById("f-user").addEventListener("input", (e) => {
+document.getElementById("f-user").addEventListener("change", (e) => {
   state.user = e.target.value;
-  clearTimeout(userTimer);
-  userTimer = setTimeout(() => {
-    renderFilters();
-    render();
-  }, 180);
+  renderFilters();
+  render();
 });
 
 document.getElementById("f-clear").addEventListener("click", () => {

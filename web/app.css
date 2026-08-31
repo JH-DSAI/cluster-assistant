@@ -768,7 +768,8 @@ select:hover {
   font-size: 13px;
 }
 
-.filters input[type="search"] {
+.filters input[type="search"],
+.filters select#f-user {
   width: 170px;
 }
 
