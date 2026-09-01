@@ -43,8 +43,6 @@ const FILES = {
   scontrolNodeText: "scontrol_node.txt",
   sacctHistText: "sacct_hist.txt",
 };
-// A missing history dump costs one card, not the page, so it gets no error banner.
-const OPTIONAL_FILES = new Set(["sacctHistText"]);
 const FILENAME_TO_KEY = Object.fromEntries(Object.entries(FILES).map(([key, name]) => [name, key]));
 const STALE_MS = 15 * 60_000;
 const TOP_N = 10;
@@ -173,6 +171,7 @@ async function handleUpload(fileList) {
   const main = document.getElementById("main");
   main.dataset.busy = "1";
   const uploadErrors = [];
+  let addedAny = false;
 
   for (const file of files) {
     let entries;
@@ -187,35 +186,45 @@ async function handleUpload(fileList) {
       if (!key) continue;
       texts[key] = entry.text;
       stamps[FILES[key]] = entry.mtime ?? new Date();
+      addedAny = true;
     }
   }
 
   rebuild(uploadErrors);
+  if (addedAny) collapseSteps();
   main.dataset.busy = "0";
 }
 
-function uploadChecklist() {
-  const missing = Object.entries(FILES).filter(([key]) => !(key in texts) && !OPTIONAL_FILES.has(key));
-  if (!missing.length) return "";
-  const items = Object.entries(FILES)
-    .map(([key, name]) => {
-      const done = key in texts;
-      return `<li class="${done ? "done" : "missing"}">${esc(name)}${
-        OPTIONAL_FILES.has(key) ? ' <span class="dim">(optional)</span>' : ""
-      }</li>`;
-    })
-    .join("");
-  return `<div class="checklist">
-    <p class="checklist-head">Waiting on ${n(missing.length)} file${
-      missing.length === 1 ? "" : "s"
-    } — the sections that need them will be empty until they're uploaded:</p>
-    <ul>${items}</ul>
-  </div>`;
+function collapseSteps() {
+  document.getElementById("steps").hidden = true;
+  document.getElementById("steps-reopen").hidden = false;
 }
 
+function expandSteps() {
+  document.getElementById("steps").hidden = false;
+  document.getElementById("steps-reopen").hidden = true;
+}
+
+document.getElementById("steps-reopen").addEventListener("click", expandSteps);
+
+// Lives beside the upload zone, so the
+// command stays available to re-copy even once nothing is missing.
+document.querySelector(".getdata-copy").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  const host = document.getElementById("getdata-host").value.trim() || "<hostname>";
+  const scriptUrl = new URL("../data/get_data.sh", location.href).href;
+  const cmd = `curl -fsSL ${scriptUrl} | bash -s -- ${host} --format gz`;
+  try {
+    await navigator.clipboard.writeText(cmd);
+    btn.textContent = "Copied";
+  } catch {
+    btn.textContent = "Copy failed — select it by hand";
+  }
+  setTimeout(() => (btn.textContent = "Copy command"), 1600);
+});
+
 function rebuild(uploadErrors = []) {
-  document.getElementById("errors").innerHTML =
-    uploadErrors.map((m) => `<div class="error">${esc(m)}</div>`).join("") + uploadChecklist();
+  document.getElementById("errors").innerHTML = uploadErrors.map((m) => `<div class="error">${esc(m)}</div>`).join("");
 
   // Wait times are measured from when the data was captured, not from the
   // browser clock, so they stay put while the page is open.

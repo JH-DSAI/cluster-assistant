@@ -200,17 +200,9 @@ h1 {
 /* ---------- upload ---------- */
 
 .upload-zone {
-  border: 1px dashed var(--border);
-  border-radius: 6px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
+  border-style: dashed;
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.upload-zone p {
-  margin: 0;
 }
 
 .upload-zone.dragover {
@@ -1197,43 +1189,67 @@ td.clip {
   content: "⚠ ";
 }
 
-.checklist {
-  border-left: 3px solid var(--status-warning);
-  padding: 10px 14px;
-  background: var(--wash);
+.steps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
   margin-bottom: 16px;
+}
+
+.steps[hidden] {
+  display: none;
+}
+
+.steps-reopen {
+  margin-bottom: 16px;
+}
+
+.step {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
   font-size: 13px;
 }
 
-.checklist-head {
+.step p {
   margin: 0 0 8px;
 }
 
-.checklist ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 4px 16px;
+.step p:last-child {
+  margin-bottom: 0;
 }
 
-.checklist li::before {
-  display: inline-block;
+.step-head {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 1.3em;
+  height: 1.3em;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
 }
 
-.checklist li.done {
-  color: var(--text-secondary);
+.getdata-row {
+  display: flex;
+  gap: 8px;
 }
 
-.checklist li.done::before {
-  content: "✓";
-  color: var(--status-good);
-}
-
-.checklist li.missing::before {
-  content: "☐";
+.getdata-row input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 400 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  min-height: 26px;
+  padding: 3px 7px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
 }
 
 /* ---------- tooltip ---------- */
@@ -1401,6 +1417,9 @@ main[data-busy="1"] {
 }
 
 @media (max-width: 640px) {
+  .steps {
+    grid-template-columns: 1fr;
+  }
   .row {
     grid-template-columns: 70px 1fr;
   }

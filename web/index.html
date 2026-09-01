@@ -22,20 +22,35 @@
         </div>
       </header>
 
-      <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Upload cluster dump files">
-        <input
-          type="file"
-          id="upload-input"
-          multiple
-          hidden
-          accept=".zip,.tar,.tar.gz,.tgz,.gz,.txt"
-        />
-        <p>
-          Drop a <b>.zip</b> or <b>.tar</b>/<b>.tar.gz</b> of the dump files here, or the raw <b>.txt</b> files
-          themselves — or <span class="upload-browse">choose files</span>. Uploading again tops up or replaces
-          whichever files it contains.
-        </p>
+      <div class="steps" id="steps">
+        <div class="step getdata">
+          <p class="step-head"><span class="step-num">1</span> Get data <span class="dim">(runs over ssh)</span></p>
+          <p class="dim">
+            Enter your cluster login node info below and click "Copy command". Then paste that command in a
+            terminal and run it. You can see the raw command <a href="../data/get_data.sh" target="_blank" rel="noopener">here</a>.
+          </p>
+          <div class="getdata-row">
+            <input type="text" id="getdata-host" placeholder="login node, e.g. login.cluster.edu" />
+            <button type="button" class="getdata-copy">Copy command</button>
+          </div>
+        </div>
+
+        <div class="step upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Upload cluster dump files">
+          <input
+            type="file"
+            id="upload-input"
+            multiple
+            hidden
+            accept=".zip,.tar,.tar.gz,.tgz,.gz,.txt"
+          />
+          <p class="step-head"><span class="step-num">2</span> Upload data</p>
+          <p class="dim">
+            Drag and drop or <span class="upload-browse">choose the file</span> that you just pulled. Uploading
+            again tops up or replaces whichever files it contains.
+          </p>
+        </div>
       </div>
+      <button type="button" class="steps-reopen" id="steps-reopen" hidden>+ Upload again</button>
 
       <nav class="tabs" role="tablist" aria-label="Views">
         <button role="tab" id="tab-status" data-tab="status" aria-selected="true" aria-controls="view-status">
